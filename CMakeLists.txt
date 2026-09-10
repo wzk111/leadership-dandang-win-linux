@@ -52,7 +52,7 @@ if(BUILD_TESTING)
   endforeach()
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  pkg_check_modules(ATSPI REQUIRED IMPORTED_TARGET atspi-2)
+  pkg_check_modules(ATSPI REQUIRED IMPORTED_TARGET atspi-2 gobject-2.0)
   add_library(worksidekick_selection src/platform/linux/AtSpiSelectionProvider.cpp
     src/platform/linux/AtSpiSelectionMonitor.cpp src/platform/linux/AtSpiNativeSession.cpp src/platform/linux/IAtSpiSession.h)
   target_link_libraries(worksidekick_selection PUBLIC worksidekick_interfaces PRIVATE PkgConfig::ATSPI)
