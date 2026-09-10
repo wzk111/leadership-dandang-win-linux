@@ -1,4 +1,4 @@
-name: Ubuntu M0
+name: Ubuntu M1
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
@@ -10,7 +10,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config qt6-base-dev libgl1-mesa-dev libsecret-1-dev xvfb dbus-x11 gnome-keyring
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev xvfb dbus-x11 gnome-keyring
       - run: /usr/bin/cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: /usr/bin/cmake --build build --parallel 2
       - name: Tests
