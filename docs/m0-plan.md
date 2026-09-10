@@ -23,3 +23,8 @@ Environment: Windows host; WSL2 cannot start (virtualization unavailable).
 Use GitHub Actions Ubuntu 22.04 for build/test evidence. Do not change BIOS,
 Windows features, or existing WSL distributions. Real GNOME X11/Wayland and
 live paid API checks remain distinct from automated headless validation.
+
+Execution result: implementation complete. Debug and Release Ubuntu 22.04 builds,
+five CTest suites, real ephemeral libsecret round-trip and launch smoke passed.
+Final tested source: 3472bd2. See m0-completion.md for evidence and the remaining
+real-desktop/live-account acceptance checks. M1 has not started.
