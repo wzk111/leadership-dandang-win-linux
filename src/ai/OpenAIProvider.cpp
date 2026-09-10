@@ -32,18 +32,26 @@ OpenAIProvider::OpenAIProvider(QObject* parent, QUrl endpoint, int timeoutMs)
         if (reply_) { abortReason_ = AIError::Timeout; reply_->abort(); }
     });
 }
-bool OpenAIProvider::busy() const { return !reply_.isNull(); }
+void OpenAIProvider::finishLater(AIError error) {
+    abortReason_ = error;
+    QTimer::singleShot(0, this, [this] {
+        const auto result = failure(abortReason_);
+        active_ = false;
+        emit completed(result);
+    });
+}
+bool OpenAIProvider::busy() const { return active_; }
 bool OpenAIProvider::generate(const AIRequest& r) {
     if (busy()) return false;
+    active_ = true;
     if (r.apiKey.trimmed().isEmpty() || r.model.trimmed().isEmpty()) {
-        const auto result = failure(r.apiKey.trimmed().isEmpty() ? AIError::MissingKey : AIError::MissingModel);
-        QTimer::singleShot(0, this, [this, result] { emit completed(result); });
+        finishLater(r.apiKey.trimmed().isEmpty() ? AIError::MissingKey : AIError::MissingModel);
         return true;
     }
     // Plain HTTP is permitted only for injected loopback test servers.
     if (endpoint_.scheme() != "https" &&
         !(endpoint_.scheme() == "http" && endpoint_.host() == "127.0.0.1")) {
-        QTimer::singleShot(0, this, [this] { emit completed(failure(AIError::Network)); });
+        finishLater(AIError::Network);
         return true;
     }
     QNetworkRequest request(endpoint_);
@@ -70,6 +78,7 @@ bool OpenAIProvider::generate(const AIRequest& r) {
             : body_.size() > 4 * 1024 * 1024 ? failure(AIError::TooLarge)
             : decode(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), reply->error(), body_);
         reply_ = nullptr;
+        active_ = false;
         body_.clear();
         reply->deleteLater();
         emit completed(result);
@@ -78,7 +87,9 @@ bool OpenAIProvider::generate(const AIRequest& r) {
     return true;
 }
 void OpenAIProvider::cancel() {
-    if (reply_) { abortReason_ = AIError::Cancelled; reply_->abort(); }
+    if (!active_) return;
+    abortReason_ = AIError::Cancelled;
+    if (reply_) reply_->abort();
 }
 AIResult OpenAIProvider::decode(int status, QNetworkReply::NetworkError networkError, const QByteArray& body) {
     if (status == 401 || status == 403) return failure(AIError::Authentication);

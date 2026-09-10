@@ -27,7 +27,11 @@ bool AppController::captureClipboard() {
     return captured_.has_value();
 }
 bool AppController::run(Feature feature) {
-    if (busy() || secrets_.busy()) return false;
+    if (busy()) return false;
+    if (secrets_.busy()) {
+        emit finished({{}, AIError::MissingKey, "Secret store is busy. Wait for the keyring operation and retry."});
+        return false;
+    }
     if (!captured_) {
         emit finished({{}, AIError::EmptyResponse, "No copied text. Choose Process Clipboard first."});
         return false;
@@ -36,7 +40,11 @@ bool AppController::run(Feature feature) {
 }
 bool AppController::testConnection() { return runText(Feature::PlainSpeak, "This is a connection test. Reply with OK."); }
 bool AppController::runText(Feature feature, const QString& text) {
-    if (busy() || secrets_.busy()) return false;
+    if (busy()) return false;
+    if (secrets_.busy()) {
+        emit finished({{}, AIError::MissingKey, "Secret store is busy. Wait for the keyring operation and retry."});
+        return false;
+    }
     const auto settings = Settings::load(settings_);
     const auto prompt = PromptBuilder::build({feature, text, settings.outputLanguage, {}});
     if (!prompt.error.isEmpty()) {
