@@ -17,7 +17,7 @@ Run these commands in an Ubuntu desktop terminal:
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build pkg-config \
-  qt6-base-dev libgl1-mesa-dev libsecret-1-dev gnome-keyring
+  qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core gnome-keyring
 
 git clone https://github.com/wzk111/leadership-dandang-win-linux.git
 cd leadership-dandang-win-linux
@@ -28,8 +28,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 OpenGL headers are needed by Qt Widgets even though this app does not render 3D.
-No AT-SPI, XInput2, input injection, root daemon or global-hook dependencies are
-needed for M0. Root is used only for installing system packages.
+M1 adds libatspi; no XInput2, input injection, root daemon or global-hook dependency
+is added. Root is used only for installing system packages.
 
 Optional install into your user account:
 
@@ -41,6 +41,22 @@ cmake --install build --prefix "$HOME/.local"
 For a Wayland-native Qt session, also install `qt6-wayland`. This does not imply
 verified GNOME Wayland compatibility; see the acceptance report. Qt may otherwise
 use XWayland. Actual platform/session information appears in Diagnostics.
+
+## M1: local selection diagnostics
+
+M0 manual clipboard AI mode remains available and is accepted. M1 adds AT-SPI2
+selection detection under Linux, using only accessibility selection events.
+**Selecting text never calls AI and never opens a floating toolbar.**
+
+Open Diagnostics, select text in another accessible application, then use
+**Test Selection** to inspect event count, application, character count and raw
+screen rectangle. **Show Last Selection Preview** explicitly reveals a local
+snapshot, never uploaded or copied automatically. Preview is hidden by default.
+Stop monitoring clears the cache; latest text also expires after 45 seconds.
+
+Support depends on each application's accessibility implementation under both
+X11 and Wayland. See [M1 acceptance](docs/m1-completion.md) and the
+[compatibility matrix](docs/linux-selection-compatibility.md). M2 is not implemented.
 
 ## First use
 
@@ -78,18 +94,19 @@ Diagnostics reports OS, desktop, session, Qt platform, M0 limitations and the la
 secure-store status. **Test Clipboard** reports only character count.
 **Test AI Connection** asks before sending a synthetic message (API charges may
 apply); it does not read or send your clipboard. **Test Selection** explains that
-native selection capture is deferred.
+native AT-SPI metadata is shown in the selection panel.
 
 ## Milestone boundaries
 
 - **M0:** manual clipboard, three actions, settings, secure keys, asynchronous API,
   result/copy/cancel, diagnostics and tray.
-- **M1–M3:** AT-SPI detection, automatic popup, X11 fallback and global shortcuts.
+- **M1:** local AT-SPI detection and explicit diagnostic preview.
+- **M2–M3:** automatic popup, X11 fallback and global shortcuts.
 - **M4:** reply/profile/features and additional AI providers.
 - **M5:** native Windows integrations.
 
-Automatic selection, automatic popup and Ctrl+Alt+P are **not implemented in M0**.
-X11 PRIMARY is not read. On either X11 or Wayland, manually copy text first.
+M1 adds local AT-SPI selection detection. Automatic popup and Ctrl+Alt+P are **not implemented**.
+X11 PRIMARY is not read. To use AI on either X11 or Wayland, manually copy text first.
 No GNOME settings are changed. Windows CMake configurations expose shared library/test targets, but Windows
 builds are NOT TESTED. M0 does not produce a native Windows application.
 
@@ -105,6 +122,8 @@ sudo apt install -y xvfb dbus-x11
 xvfb-run -a ctest --test-dir build --output-on-failure
 dbus-run-session -- bash scripts/test-keyring.sh
 xvfb-run -a ./build/worksidekick --smoke-test
+dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/test_atspi_runtime realEvents
+env AT_SPI_BUS_ADDRESS=unix:path=/nonexistent/worksidekick-test-bus ./build/test_atspi_runtime unavailableRegistry
 ```
 
 The keyring script creates an isolated temporary HOME/keyring and uses synthetic
@@ -113,7 +132,7 @@ Smoke mode opens the windows using synthetic data, sends nothing and exits.
 
 [Ubuntu CI](https://github.com/wzk111/leadership-dandang-win-linux/actions/workflows/ubuntu.yml)
 builds with Ubuntu's system CMake and Qt 6.2, then runs these checks.
-See [M0 verification](docs/m0-completion.md) for actual evidence and **NOT TESTED**
+See [M1 verification](docs/m1-completion.md) and [M0 verification](docs/m0-completion.md) for evidence and **NOT TESTED**
 items. CI is not a substitute for a GNOME desktop and a live API account.
 
 ## Privacy and documentation

@@ -54,3 +54,10 @@ Reference material:
 - [OpenAI Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create)
 
 The reference macOS project's README informed product behavior only.
+
+## M1 extension (M0 accepted)
+
+The M0 description above records the preserved baseline. M1 adds an independent
+AT-SPI monitor feeding local Diagnostics, without replacing the clipboard provider.
+See [M1 architecture](m1-architecture.md) for the worker/GLib event loop strategy,
+RAII ownership, bounded extraction, debounce and explicit preview lifecycle.

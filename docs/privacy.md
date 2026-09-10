@@ -24,3 +24,13 @@
   transmitted to the API or guarantee reversal of provider charges.
 - This application never clicks Send, submits forms, injects keystrokes or requires
   a privileged runtime process.
+
+## M1 local accessibility extension
+
+M1 additionally observes object:text-selection-changed. It retrieves only the event
+source's selected range into local memory, with size limits and a 45-second expiry.
+There is no AI/upload connection from this monitor. Source text is absent from
+metadata; Show Last Selection Preview is required to display it. Preview clears
+on change/stop/expiry/hide. No selected text is logged, persisted or copied by M1.
+This updates the earlier M0-only statement that the app has no automatic monitor;
+there is still no keyboard monitoring, general text-change listener or scraping.

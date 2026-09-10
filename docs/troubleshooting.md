@@ -58,3 +58,32 @@ remains M5.
 When reporting a problem, include OS, session type, Qt platform, model availability
 and sanitized error category. Do not attach private clipboard text, keys, raw API
 responses or your settings/credential dumps.
+
+## M1 AT-SPI diagnostics
+
+Install libatspi2.0-dev for building and at-spi2-core for the runtime bus. Run as your desktop user, with the normal
+session D-Bus. Do not run with sudo. If Diagnostics reports registry unavailable,
+check that the desktop accessibility bus is running; restart WorkSidekick after
+restoring the bus. Clipboard AI remains usable. Stop/Start monitoring can retry
+listener registration when the initialized registry is available.
+
+Listener registration failure is shown separately from text retrieval failure.
+Some apps/controls have no Text interface or report selection count zero. Select
+text in a known accessible editor, wait for the 80 ms debounce, then Test Selection.
+The button does not fall back to clipboard. Text retrieval errors may indicate a
+closed/unresponsive source or inaccessible control. A valid text result with no
+geometry is still success; geometry support varies by app and compositor.
+
+Show Last Selection Preview is explicit and local. A new selection, monitor stop,
+45-second expiry or hiding Diagnostics clears the visible preview. WorkSidekick's
+own controls and password fields are ignored. Unsupported apps need a later
+fallback; do not disable Wayland or install input injection tools for M1.
+
+The reproducible synthetic integration command (not a real desktop test) is:
+
+```bash
+dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/test_atspi_runtime realEvents
+```
+
+This starts a separate synthetic Qt text editor. It requires the development/test
+build and desktop accessibility bus packages. It performs no external API calls.

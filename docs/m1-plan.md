@@ -14,3 +14,5 @@ Scope follows M1_SPEC.md. No M2 toolbar, input hooks, automatic AI or clipboard 
 6. Run mock tests, privacy/M0 regression and separate real synthetic Qt accessible fixture
    on Xvfb/session D-Bus. Document actual geometry/events without inferring GNOME results.
 7. Update docs/compatibility/completion; stop at M1.
+
+Completed: all seven steps. Tested implementation 1be0a17; Ubuntu CI 34493879850 passed. See m1-completion.md for evidence and desktop limitations. M2 has not started.
