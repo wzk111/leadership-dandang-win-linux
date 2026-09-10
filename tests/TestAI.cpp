@@ -69,6 +69,15 @@ private slots:
         QVERIFY(json.contains("store")); QVERIFY(!json["store"].toBool());
         QVERIFY(!json.contains("temperature"));
     }
+    void queuedValidationIsBusyAndCancellable() {
+        OpenAIProvider p; QSignalSpy spy(&p, &IAIProvider::completed);
+        QVERIFY(p.generate({{"instruction", "input", {}}, "model", ""}));
+        QVERIFY(p.busy());
+        QVERIFY(!p.generate({}));
+        p.cancel(); QTRY_COMPARE(spy.size(), 1);
+        QCOMPARE(qvariant_cast<AIResult>(spy[0][0]).error, AIError::Cancelled);
+        QVERIFY(!p.busy());
+    }
     void timeoutAndCancel() {
         QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
         OpenAIProvider p(nullptr, QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort())), 40);

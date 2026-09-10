@@ -56,6 +56,18 @@ private slots:
         QVERIFY(!c.captureClipboard()); QVERIFY(!c.run(Feature::Polish));
         QCOMPARE(secret.reads, 0); QCOMPARE(ai.calls, 0);
     }
+    void busyKeyringExplainsFailure() {
+        QTemporaryDir dir; QSettings settings(dir.filePath("s.ini"), QSettings::IniFormat);
+        Settings{"model", "English"}.save(settings);
+        FakeAI ai; FakeSecret secret; FakeSelection selection;
+        AppController c(ai, secret, selection, settings);
+        QSignalSpy finished(&c, &AppController::finished);
+        QVERIFY(c.captureClipboard()); secret.active = true;
+        QVERIFY(!c.run(Feature::Polish));
+        QCOMPARE(finished.size(), 1);
+        QVERIFY(!qvariant_cast<AIResult>(finished[0][0]).message.isEmpty());
+        QCOMPARE(ai.calls, 0);
+    }
     void cancelDuringKeyRead() {
         QTemporaryDir dir; QSettings settings(dir.filePath("s.ini"), QSettings::IniFormat);
         Settings{"model", "English"}.save(settings);
