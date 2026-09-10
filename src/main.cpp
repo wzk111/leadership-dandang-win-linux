@@ -7,8 +7,9 @@
 #include "platform/ClipboardSelectionProvider.h"
 #include "app/Application.h"
 int main(int argc, char** argv) {
+    ws::preparePlatformEventLoop();
     QApplication app(argc, argv);
-    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.1.0");
+    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.2.0");
     QCommandLineParser parser; parser.setApplicationDescription("Explicit clipboard AI assistant");
     parser.addHelpOption(); parser.addVersionOption();
     parser.addOption({"smoke-test", "Open windows with synthetic data, make no network calls, then exit."});
@@ -18,7 +19,8 @@ int main(int argc, char** argv) {
     ws::ClipboardSelectionProvider clipboard(*app.clipboard());
     ws::OpenAIProvider ai;
     ws::AppController controller(ai, *secrets, clipboard, settings);
-    ws::Application application(controller, *secrets, settings);
+    auto monitor = ws::createSelectionMonitor();
+    ws::Application application(controller, *secrets, settings, monitor.get());
     application.start();
     if (parser.isSet("smoke-test")) {
         QTimer::singleShot(0, &app, [&] {

@@ -19,3 +19,5 @@ jobs:
         run: dbus-run-session -- bash scripts/test-keyring.sh
       - name: Launch smoke
         run: xvfb-run -a ./build/worksidekick --smoke-test
+      - name: AT-SPI real event integration
+        run: dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/test_atspi_runtime

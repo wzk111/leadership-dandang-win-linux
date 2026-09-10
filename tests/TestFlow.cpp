@@ -20,6 +20,16 @@ public:
     bool busy() const override { return false; }
     QString description() const override { return "Test memory store"; }
 };
+class DiagnosticMonitor : public ISelectionMonitor {
+public:
+    std::optional<Selection> value;
+    bool start() override { return true; }
+    void stop() override { value.reset(); emit selectionCleared(); }
+    MonitorStatus status() const override { return {}; }
+    std::optional<Selection> latestSelection() const override { return value; }
+    QString backendName() const override { return "Synthetic AT-SPI"; }
+    void detect() { value=Selection{"PRIVATE LOCAL SELECTION", {}, "fixture"}; emit selectionDetected(*value); emit statusChanged(); }
+};
 class TestFlow : public QObject {
     Q_OBJECT
 private slots:
@@ -43,7 +53,8 @@ private slots:
         ClipboardSelectionProvider clipboard(*QApplication::clipboard());
         OpenAIProvider ai(nullptr, QUrl(QString("http://127.0.0.1:%1/v1/responses").arg(server.serverPort())));
         AppController controller(ai, secrets, clipboard, settings);
-        Application app(controller, secrets, settings); app.start();
+        DiagnosticMonitor monitor;
+        Application app(controller, secrets, settings, &monitor); app.start();
         QApplication::setQuitOnLastWindowClosed(false);
         WorkspaceWindow* workspace = nullptr; ResultCard* result = nullptr; SettingsWindow* settingsWindow = nullptr;
         for (auto* w : QApplication::topLevelWidgets()) {
@@ -53,6 +64,24 @@ private slots:
         }
         QVERIFY(workspace); QVERIFY(result); QVERIFY(settingsWindow);
         QCOMPARE(requests, 0);
+        QApplication::clipboard()->setText("unchanged clipboard");
+        monitor.detect();
+        QCOMPARE(requests, 0); QVERIFY(!ai.busy());
+        QCOMPARE(QApplication::clipboard()->text(), QString("unchanged clipboard"));
+        QVERIFY(workspace->findChild<QPlainTextEdit*>("clipboardPreview")->toPlainText().isEmpty());
+        app.openDiagnostics();
+        SelectionDiagnostics* panel=nullptr;
+        for(auto* w : QApplication::topLevelWidgets()) {
+            if(auto* p=w->findChild<SelectionDiagnostics*>()) panel=p;
+        }
+        QVERIFY(panel);
+        auto* preview=panel->findChild<QPlainTextEdit*>("selectionPreview");
+        QVERIFY(preview->toPlainText().isEmpty());
+        QVERIFY(!panel->findChild<QPlainTextEdit*>("selectionMetadata")->toPlainText().contains("PRIVATE LOCAL SELECTION"));
+        panel->findChild<QPushButton*>("showSelectionPreview")->click();
+        QCOMPARE(preview->toPlainText(), QString("PRIVATE LOCAL SELECTION"));
+        QCOMPARE(requests, 0);
+        monitor.stop(); QVERIFY(preview->toPlainText().isEmpty());
         QApplication::clipboard()->setText("Synthetic source text.");
         workspace->findChild<QPushButton*>("processClipboard")->click();
         QCOMPARE(requests, 0);

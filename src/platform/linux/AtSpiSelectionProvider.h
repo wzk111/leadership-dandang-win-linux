@@ -4,6 +4,7 @@ namespace ws {
 struct SelectionRead {
     std::optional<Selection> selection;
     QString description;
+    bool ignored = false;
 };
 // Small mockable view of one event source, never a desktop-tree traversal.
 class IAtSpiTextSource {
