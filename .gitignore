@@ -1,0 +1,13 @@
+/build*/
+/.cache/
+/.tools/
+/.local/
+*.user
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+/.idea/
+/.vscode/
