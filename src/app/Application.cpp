@@ -44,7 +44,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     diagnostics_.setWindowTitle("WorkSidekick — Diagnostics"); diagnostics_.resize(700, 760);
     auto* layout = new QVBoxLayout(&diagnostics_);
     diagnosticsText_ = new QPlainTextEdit(&diagnostics_); diagnosticsText_->setReadOnly(true); layout->addWidget(diagnosticsText_);
-    testStatus_ = new QLabel("Tests are explicit; no private text is included in diagnostics.", &diagnostics_);
+    testStatus_ = new QLabel("Metadata excludes selected text; local preview requires an explicit action.", &diagnostics_);
     testStatus_->setWordWrap(true); layout->addWidget(testStatus_);
     selectionPanel_ = new SelectionDiagnostics(monitor_, &diagnostics_);
     layout->addWidget(selectionPanel_);
