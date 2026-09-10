@@ -13,6 +13,7 @@ public:
     QString description() const override;
 private:
     bool start(int operation, const QString& key = {});
+    bool active_ = false;
     QString account_;
     QFutureWatcher<SecretResult> watcher_;
 };

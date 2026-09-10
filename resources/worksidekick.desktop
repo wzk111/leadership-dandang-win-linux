@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=WorkSidekick
+Comment=Explicit clipboard AI assistant
+Exec=worksidekick
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;
+StartupNotify=true

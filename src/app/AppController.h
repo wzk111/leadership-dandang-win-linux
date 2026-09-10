@@ -11,6 +11,7 @@ public:
                   QSettings& settings, QObject* parent = nullptr);
     bool captureClipboard();
     bool run(Feature feature);
+    bool testConnection();
     void cancel();
     bool busy() const;
 signals:
@@ -18,6 +19,7 @@ signals:
     void loading();
     void finished(const ws::AIResult& result);
 private:
+    bool runText(Feature feature, const QString& text);
     IAIProvider& ai_;
     ISecretStore& secrets_;
     ISelectionProvider& selection_;
