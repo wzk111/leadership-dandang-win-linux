@@ -13,6 +13,7 @@ public:
     virtual bool remove() = 0;
     virtual bool busy() const = 0;
     virtual QString description() const = 0;
+    virtual QString credentialStatus(const QString&) const { return "not checked"; }
 signals:
     void readFinished(const ws::SecretResult& result);
     void writeFinished(bool success, const QString& message);
