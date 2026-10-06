@@ -11,6 +11,7 @@ public:
                   QSettings& settings, QObject* parent = nullptr);
     bool captureClipboard();
     bool run(Feature feature);
+    bool runSelection(Feature feature, const Selection& selection);
     bool testConnection();
     void cancel();
     bool busy() const;

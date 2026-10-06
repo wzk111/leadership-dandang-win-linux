@@ -11,7 +11,7 @@
 #include <QStyle>
 #include <QSysInfo>
 namespace ws {
-Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor)
+Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor, IPlatformWindowPolicy*)
     : monitor_(monitor), controller_(controller), secrets_(secrets), settingsStore_(settings), settings_(settings, secrets) {
     auto showWorkspace = [this] { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); };
     connect(&workspace_, &WorkspaceWindow::processClipboard, &controller_, &AppController::captureClipboard);

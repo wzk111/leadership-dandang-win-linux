@@ -4,6 +4,7 @@
 #include <QSystemTrayIcon>
 #include <QWidget>
 #include "AppController.h"
+#include "platform/IPlatformWindowPolicy.h"
 #include "ui/WorkspaceWindow.h"
 #include "ui/SettingsWindow.h"
 #include "ui/ResultCard.h"
@@ -14,7 +15,7 @@ namespace ws {
 class Application : public QObject {
     Q_OBJECT
 public:
-    Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor = nullptr);
+    Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor = nullptr, IPlatformWindowPolicy* policy = nullptr);
     ~Application() override;
     void start();
     void openSettings();

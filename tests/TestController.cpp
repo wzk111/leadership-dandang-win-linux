@@ -31,6 +31,23 @@ public:
 class TestController : public QObject {
     Q_OBJECT
 private slots:
+    void selectionSnapshotIndependentOfClipboard() {
+        QTemporaryDir dir; QSettings settings(dir.filePath("s.ini"), QSettings::IniFormat);
+        Settings{"model","English"}.save(settings);
+        FakeAI ai; FakeSecret secret; FakeSelection clipboard;
+        AppController c(ai,secret,clipboard,settings);
+        Selection selection{"AT-SPI original",{},"fixture"};
+        QVERIFY(c.runSelection(Feature::Polish,selection));
+        QVERIFY(c.busy()); QVERIFY(!c.runSelection(Feature::Summarize,selection));
+        selection.text="mutated";
+        secret.respond();
+        QCOMPARE(ai.last.prompt.user,QString("AT-SPI original"));
+        QCOMPARE(ai.calls,1); QCOMPARE(clipboard.reads,0);
+        ai.respond();
+        QVERIFY(!c.runSelection(Feature::Polish,{"   ",{}, {}}));
+        QCOMPARE(ai.calls,1); QCOMPARE(secret.reads,1);
+    }
+
     void explicitActionOnly() {
         QTemporaryDir dir; QSettings settings(dir.filePath("s.ini"), QSettings::IniFormat);
         Settings{"configured-model", "English"}.save(settings);
