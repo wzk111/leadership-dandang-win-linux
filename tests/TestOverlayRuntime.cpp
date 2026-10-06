@@ -63,8 +63,10 @@ private slots:
         QSignalSpy detected(&monitor,&ISelectionMonitor::selectionDetected);
         qint64 displayLatency=-1;
         connect(&monitor,&ISelectionMonitor::selectionDetected,&monitor,[&](const Selection&) {
-            QElapsedTimer t; t.start();
-            QTimer::singleShot(0,&monitor,[&,t] { if(bar->isVisible()) displayLatency=t.elapsed(); });
+            const auto receivedAt=monitor.status().lastEvent;
+            QTimer::singleShot(0,&monitor,[&,receivedAt] {
+                if(bar->isVisible()) displayLatency=receivedAt.msecsTo(QDateTime::currentDateTimeUtc());
+            });
         });
         FixtureProcess fixture;
         fixture.start(QCoreApplication::applicationDirPath()+"/accessible_fixture",{"--overlay-test"});
@@ -91,7 +93,7 @@ private slots:
         QVERIFY(screen->availableGeometry().contains(bar->geometry()));
         QCOMPARE(ai.calls,0);
         QTRY_VERIFY(displayLatency>=0);
-        qInfo("Selection delivery to visible toolbar sample: %lld ms (excludes M1 debounce and source IPC)",static_cast<long long>(displayLatency));
+        qInfo("AT-SPI event received to visible toolbar sample: %lld ms (includes debounce/extraction; excludes source-to-bus transit)",static_cast<long long>(displayLatency));
         int clicks=0; Selection clicked;
         // Disconnect only this test's Application receiver so ResultCard activation cannot
         // obscure the ActionBar's own focus behavior. HTTP routing is tested separately.
