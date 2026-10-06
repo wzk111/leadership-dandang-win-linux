@@ -24,5 +24,5 @@ jobs:
           dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/test_atspi_runtime realEvents
           env AT_SPI_BUS_ADDRESS=unix:path=/nonexistent/worksidekick-test-bus ./build/test_atspi_runtime unavailableRegistry
 
-      - name: X11 overlay focus and placement
+      - name: X11 overlay focus, placement and global shortcut
         run: dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 bash scripts/test-overlay.sh

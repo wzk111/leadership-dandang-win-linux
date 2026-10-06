@@ -36,6 +36,27 @@ private slots:
         cold.terminate(); if(!cold.waitForFinished(3000)) {cold.kill();cold.waitForFinished();}
     }
 
+    void simultaneousStartupKeepsOnePrimary() {
+        QTemporaryDir dir;
+        const auto exe=QCoreApplication::applicationDirPath()+"/instance_peer";
+        QProcess a,b; a.start(exe,{dir.filePath("ipc")}); b.start(exe,{dir.filePath("ipc")});
+        QVERIFY(a.waitForStarted()); QVERIFY(b.waitForStarted());
+        QByteArray first,second;
+        QTRY_VERIFY_WITH_TIMEOUT(([&] {
+            first+=a.readAllStandardOutput(); second+=b.readAllStandardOutput();
+            return (first.contains("primary") || second.contains("primary")) &&
+                (a.state()==QProcess::NotRunning || b.state()==QProcess::NotRunning);
+        })(),5000);
+        QCOMPARE(first.count("primary")+second.count("primary"),1);
+        auto* owner=first.contains("primary")?&a:&b;
+        auto* other=owner==&a?&b:&a;
+        QCOMPARE(owner->state(),QProcess::Running);
+        QVERIFY(other->exitCode()==0 || other->exitCode()==2);
+        // A losing startup may ask for retry, but must leave the primary reachable.
+        QProcess retry; retry.start(exe,{dir.filePath("ipc"),"--trigger"});
+        QVERIFY(retry.waitForFinished(5000)); QCOMPARE(retry.exitCode(),0);
+        owner->kill(); QVERIFY(owner->waitForFinished());
+    }
     void permissionsAndProtocol() {
         QTemporaryDir dir; InstanceCoordinator instance(dir.filePath("ipc"));
         QCOMPARE(instance.start(false),InstanceCoordinator::Result::Primary);
