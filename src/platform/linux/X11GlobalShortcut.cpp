@@ -113,4 +113,6 @@ void X11GlobalShortcut::stop() {
     status_.registered=false; status_.triggerDescription.clear(); status_.description="Disabled"; emit statusChanged();
 }
 }
+#undef Bool
+#undef Status
 #include "X11GlobalShortcut.moc"

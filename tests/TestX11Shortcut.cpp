@@ -1,6 +1,7 @@
 #include <QtTest>
 #include <QApplication>
 #include <QClipboard>
+#include <QProcess>
 #include "platform/linux/X11GlobalShortcut.h"
 #include "platform/linux/LinuxSelectionResolver.h"
 #include <X11/Xlib.h>
@@ -13,14 +14,16 @@ class TestX11Shortcut : public QObject {
 private slots:
     void primaryReadOnly() {
         auto* clipboard=QApplication::clipboard(); QVERIFY(clipboard->supportsSelection());
-        clipboard->setText("PRIMARY TEXT",QClipboard::Selection);
-        clipboard->setText("OLD CLIPBOARD TEXT",QClipboard::Clipboard);
+        QProcess owner; owner.start(QCoreApplication::applicationDirPath()+"/primary_owner");
+        QVERIFY(owner.waitForStarted()); QByteArray ready;
+        QTRY_VERIFY(([&]{ready+=owner.readAllStandardOutput();return ready.contains("ready");})());
         LinuxSelectionResolver resolver(nullptr,*clipboard); QVERIFY(resolver.primarySupported());
         auto r=resolver.resolve(); QVERIFY(r); QCOMPARE(r->source,SelectionSource::PrimarySelection);
         QCOMPARE(r->selection.text,QString("PRIMARY TEXT")); QVERIFY(!r->selection.anchorRect);
         QCOMPARE(clipboard->text(QClipboard::Clipboard),QString("OLD CLIPBOARD TEXT"));
         QCOMPARE(clipboard->text(QClipboard::Selection),QString("PRIMARY TEXT"));
         clipboard->clear(QClipboard::Selection); r=resolver.resolve(); QVERIFY(r); QCOMPARE(r->source,SelectionSource::Clipboard);
+        owner.terminate(); if(!owner.waitForFinished(3000)) {owner.kill();owner.waitForFinished();}
     }
     void realGrabCollisionAndLocks() {
         X11GlobalShortcut first,second; QSignalSpy activated(&first,&IGlobalShortcut::activated);

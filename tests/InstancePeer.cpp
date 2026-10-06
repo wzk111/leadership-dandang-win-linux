@@ -5,7 +5,7 @@
 using namespace ws;
 int main(int argc,char** argv) {
     QCoreApplication app(argc,argv);
-    InstanceCoordinator instance(app.arguments().value(1));
+    InstanceCoordinator instance(app.arguments().value(1)=="--default"?QString{}:app.arguments().value(1));
     QObject::connect(&instance,&InstanceCoordinator::triggerRequested,&app,[]{ QTextStream(stdout)<<"trigger"<<Qt::endl; });
     QObject::connect(&instance,&InstanceCoordinator::openRequested,&app,[]{ QTextStream(stdout)<<"open"<<Qt::endl; });
     const auto r=instance.start(app.arguments().contains("--trigger"));

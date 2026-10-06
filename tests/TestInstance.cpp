@@ -1,5 +1,6 @@
 #include <QtTest>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QTemporaryDir>
 #include <QLocalSocket>
 #include <QFileInfo>
@@ -8,6 +9,33 @@ using namespace ws;
 class TestInstance : public QObject {
     Q_OBJECT
 private slots:
+    void productionCliForwardingAndColdStart() {
+        QTemporaryDir runtime;
+        auto environment=QProcessEnvironment::systemEnvironment();
+        environment.insert("XDG_RUNTIME_DIR",runtime.path());
+        environment.insert("XDG_CONFIG_HOME",runtime.filePath("config"));
+        const auto directory=QCoreApplication::applicationDirPath();
+        QProcess primary; primary.setProcessEnvironment(environment);
+        primary.start(directory+"/instance_peer",{"--default"});
+        QVERIFY(primary.waitForStarted()); QByteArray output;
+        QTRY_VERIFY_WITH_TIMEOUT(([&]{output+=primary.readAllStandardOutput();return output.contains("primary");})(),5000);
+        QProcess client; client.setProcessEnvironment(environment);
+        client.start(directory+"/worksidekick",{"--trigger"}); QVERIFY(client.waitForFinished(5000)); QCOMPARE(client.exitCode(),0);
+        QTRY_VERIFY(([&]{output+=primary.readAllStandardOutput();return output.contains("trigger");})());
+        QCOMPARE(output.count("trigger"),1);
+        client.start(directory+"/worksidekick",{}); QVERIFY(client.waitForFinished(5000)); QCOMPARE(client.exitCode(),0);
+        QTRY_VERIFY(([&]{output+=primary.readAllStandardOutput();return output.contains("open");})());
+        primary.kill(); QVERIFY(primary.waitForFinished());
+        QProcess cold; cold.setProcessEnvironment(environment); cold.start(directory+"/worksidekick",{"--trigger"});
+        QVERIFY(cold.waitForStarted());
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(runtime.filePath("worksidekick/command.sock")),5000);
+        // Allow event-loop startup; a real second command must be acknowledged by the app.
+        QTest::qWait(200);
+        client.start(directory+"/worksidekick",{"--trigger"}); QVERIFY(client.waitForFinished(5000)); QCOMPARE(client.exitCode(),0);
+        QCOMPARE(cold.state(),QProcess::Running);
+        cold.terminate(); if(!cold.waitForFinished(3000)) {cold.kill();cold.waitForFinished();}
+    }
+
     void permissionsAndProtocol() {
         QTemporaryDir dir; InstanceCoordinator instance(dir.filePath("ipc"));
         QCOMPARE(instance.start(false),InstanceCoordinator::Result::Primary);
