@@ -18,7 +18,7 @@ Run these commands in an Ubuntu desktop terminal:
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build pkg-config \
-  qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core gnome-keyring libx11-dev
+  qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core gnome-keyring libx11-dev libxtst-dev
 
 git clone https://github.com/wzk111/leadership-dandang-win-linux.git
 cd leadership-dandang-win-linux
@@ -77,15 +77,52 @@ AI request hides the bar. Enabling waits for a new selection. Dismiss does not
 disable future popups.
 
 On native Qt **wayland / wayland-egl**, anchored automatic popup is disabled.
-AT-SPI diagnostics continue; use **Process Clipboard** for AI. Qt backend and
-desktop session are reported separately in Diagnostics. No compositor-specific
-workaround, global shortcut, input injection or X11 PRIMARY fallback is included.
+AT-SPI diagnostics continue; use the M3 manual palette or **Process Clipboard**. Qt backend and
+desktop session are reported separately in Diagnostics. M3 adds a manual shortcut/fallback path described below; no compositor workaround or input injection is used.
 
 Missing anchor geometry keeps the M1 local selection available but prevents
 automatic placement. HiDPI, fractional/mixed scaling, real multi-monitor behavior
 and real GNOME app compatibility are **NOT TESTED**.
 See [M2 verification](docs/m2-completion.md) and
 [overlay compatibility](docs/m2-overlay-compatibility.md).
+
+## M3: manual selection actions and global shortcut
+
+Three entry modes are available:
+
+1. **Automatic:** enable Automatic selection toolbar, select text, then click the
+   M2 ActionBar. Requires supported Qt xcb overlay and AT-SPI geometry.
+2. **Global shortcut:** enable **Enable global shortcut** in Settings or the tray,
+   then select/copy text and press the registered shortcut (preferred **Ctrl+Alt+P**).
+3. **External / desktop custom shortcut:** execute
+   `/absolute/path/to/worksidekick --trigger`. GNOME users can assign this command
+   in Settings → Keyboard → Custom Shortcuts. No desktop settings are changed automatically.
+
+The tray's **Open Selection Actions** uses the same manual path and works even when
+shortcut registration is unavailable.
+
+The manual resolver tries **cached AT-SPI → X11 PRIMARY → Clipboard**. PRIMARY is
+read-only and only available on Qt xcb when supported. Native Wayland skips PRIMARY.
+The normal, focusable palette shows the source and a local preview; check it for
+stale clipboard content before clicking a feature. The full snapshot is preserved
+even when the preview is shortened. Shortcut/trigger alone sends **no AI request**.
+
+Shortcut preference defaults **OFF**, independently of the automatic toolbar.
+X11 registers Ctrl+Alt+P with Caps/Num Lock handling; conflicts fail without taking
+another application's binding. Native Wayland probes the GlobalShortcuts portal
+and shows its actual returned binding. Portal configuration requires an explicit
+enable or **Register / retry shortcut** action, including after restarting with a
+saved enabled preference. No repeated permission dialogs are opened automatically.
+
+If the portal is unavailable, tray and --trigger remain available. Real GNOME portal,
+native Wayland focus behavior and XWayland cross-application coverage are **NOT TESTED**.
+The manual palette does not require arbitrary absolute positioning.
+
+Only one resident instance runs per user runtime directory. A second --trigger
+forwards one command and exits; normal second launch opens the existing workspace.
+With no instance, --trigger starts one and opens the palette. No text travels over IPC.
+See [M3 verification](docs/m3-completion.md) and
+[fallback compatibility](docs/m3-fallback-compatibility.md).
 
 ## First use / manual clipboard mode
 
@@ -131,12 +168,11 @@ native AT-SPI metadata is shown in the selection panel.
   result/copy/cancel, diagnostics and tray.
 - **M1:** local AT-SPI detection and explicit diagnostic preview.
 - **M2:** non-activating selection ActionBar on supported backends.
-- **M3:** Linux fallback and global shortcuts.
+- **M3:** explicit AT-SPI / PRIMARY / clipboard fallback, global shortcut and --trigger.
 - **M4:** reply/profile/features and additional AI providers.
 - **M5:** native Windows integrations.
 
-M2 adds optional automatic popup on Qt xcb. Ctrl+Alt+P is **not implemented**.
-X11 PRIMARY is not read. Manual clipboard mode remains available on either X11 or Wayland.
+M2 automatic popup and M3 manual actions coexist. PRIMARY is read only after explicit trigger on Qt xcb. Manual clipboard mode remains available on either X11 or Wayland.
 No GNOME settings are changed. Windows CMake configurations expose shared library/test targets, but Windows
 builds are NOT TESTED. M0 does not produce a native Windows application.
 
@@ -148,7 +184,7 @@ controller and end-to-end tests. All network tests use local synthetic responses
 For a headless Ubuntu machine:
 
 ```bash
-sudo apt install -y xvfb dbus-x11 libx11-dev openbox
+sudo apt install -y xvfb dbus-x11 libx11-dev libxtst-dev openbox
 xvfb-run -a ctest --test-dir build --output-on-failure
 dbus-run-session -- bash scripts/test-keyring.sh
 xvfb-run -a ./build/worksidekick --smoke-test
@@ -163,7 +199,7 @@ Smoke mode opens the windows using synthetic data, sends nothing and exits.
 
 [Ubuntu CI](https://github.com/wzk111/leadership-dandang-win-linux/actions/workflows/ubuntu.yml)
 builds with Ubuntu's system CMake and Qt 6.2, then runs these checks.
-See [M2 verification](docs/m2-completion.md), [M1 verification](docs/m1-completion.md) and [M0 verification](docs/m0-completion.md) for evidence and **NOT TESTED**
+See [M3 verification](docs/m3-completion.md), [M2 verification](docs/m2-completion.md), [M1 verification](docs/m1-completion.md) and [M0 verification](docs/m0-completion.md) for evidence and **NOT TESTED**
 items. CI is not a substitute for a GNOME desktop and a live API account.
 
 ## Privacy and documentation
@@ -178,7 +214,7 @@ scrapes apps, records clipboard history or monitors input.
 - [Troubleshooting](docs/troubleshooting.md)
 - [Linux compatibility](docs/linux-selection-compatibility.md)
 - [Windows compatibility](docs/windows-selection-compatibility.md)
-- [M2 specification](docs/M2_SPEC.md)
-- [M2 implementation plan](docs/m2-plan.md)
+- [M3 specification](docs/M3_SPEC.md)
+- [M3 implementation plan](docs/m3-plan.md)
 
 No project license has been selected yet; no open-source license grant is implied.

@@ -122,3 +122,53 @@ dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 bash scri
 
 This launches Openbox inside the isolated Xvfb display and a synthetic accessible
 fixture; do not run it directly on your normal desktop DISPLAY. It uses no paid API.
+
+## M3 shortcut and fallback
+
+Enable global shortcut in Settings or the tray. Default is OFF. Use
+Register / retry shortcut after cancellation or a failure. This preference is
+independent of Automatic selection toolbar.
+
+- **Ctrl+Alt+P already used:** X11 registration fails rather than overriding the
+  other application. Release the conflicting desktop binding or use tray / --trigger,
+  then retry. Keyboard-map changes during a session may require disable/re-enable.
+- **Portal unavailable:** Diagnostics reports the real probe result/version.
+  An installed xdg-desktop-portal package does not guarantee GlobalShortcuts.
+  Use tray Open Selection Actions or a desktop custom shortcut for --trigger.
+- **Portal cancelled / lost:** no automatic permission-dialog retry. Explicitly
+  re-enable or use Register / retry shortcut. A saved enabled preference does not
+  silently bind on native Wayland startup; explicit retry is required each session.
+  Pending configuration is bounded to three minutes.
+- **PRIMARY unsupported:** only Qt xcb with supportsSelection participates.
+  On native Wayland use AT-SPI or explicitly copy first.
+- **Unexpected AT-SPI selection:** cached AT-SPI is preferred until M1 clears or
+  expires it. Inspect the source/preview and close without action if it is wrong.
+  Stop M1 monitoring to force fallback while troubleshooting; do not upload blindly.
+- **Empty text:** select again, or copy first; whitespace and >100,000-character
+  input are rejected. Empty retrigger clears the old palette snapshot.
+- **AI busy:** no new selection is queued. Finish/cancel then trigger again.
+- **Native Wayland automatic popup absent:** still expected. The M3 manual palette
+  is a normal compositor-managed window; automatic anchored M2 remains unsupported.
+
+### External trigger / GNOME custom shortcut
+
+Run `/absolute/path/to/worksidekick --trigger`. If absent, it starts the primary
+instance and opens selection actions. Otherwise it forwards one local command.
+Normal second launch opens the existing workspace.
+
+In GNOME Settings → Keyboard → Custom Shortcuts, add a shortcut whose command is
+the absolute executable path followed by --trigger. Labels may vary by desktop.
+WorkSidekick does not run gsettings/dconf or change your desktop configuration.
+On native Wayland a compositor may place or focus a normal window according to
+its own activation policy; real desktop behavior is NOT TESTED.
+
+### Second instance / stale socket
+
+Run both invocations as the same logged-in user with the same XDG_RUNTIME_DIR.
+The endpoint is in its worksidekick subdirectory. If another instance is starting
+or temporarily unresponsive, retry after it is ready. Never delete a live socket.
+A dead process's lock/socket is recovered automatically after checking ownership
+and obtaining the primary lifetime lock. Unsafe directory ownership/symlinks or
+permission failures are reported without replacing a running instance.
+Exit code 2 means local coordination failed. Do not use sudo as a workaround.
+`--smoke-test` is an isolated developer mode and intentionally bypasses IPC.

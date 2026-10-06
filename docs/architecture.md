@@ -109,3 +109,53 @@ expiry/history mechanism exists. Last anchor/placement metadata retains no text.
 Qt references: [window flags and attributes](https://doc.qt.io/qt-6/qt.html#WindowType-enum)
 and [screenAt](https://doc.qt.io/qt-6/qguiapplication.html#screenAt).
 See [M2 completion](m2-completion.md) and [overlay matrix](m2-overlay-compatibility.md).
+
+## M3 manual fallback and shortcuts
+
+All explicit entrypoints (shortcut, tray Open Selection Actions, external --trigger)
+call Application::triggerManualActions. Resolution occurs before activating the
+normal ManualActionPalette. SelectionResolver invokes lazy source callbacks in
+order: live M1 cache, supported xcb PRIMARY, Clipboard. Empty/whitespace and over
+100,000 UTF-16 units are rejected. LinuxSelectionResolver gates PRIMARY on both
+xcb and QClipboard::supportsSelection. It never writes PRIMARY or monitors changes.
+
+ManualActionPalette owns a ResolvedSelection value and labels its source. The
+first 1,000 characters are shown locally; the complete snapshot is sent only after
+a FeatureRegistry button click, via existing AppController::runSelection.
+Repeated triggers replace the snapshot, empty triggers clear it, closing/hiding
+clears text, and a busy AI request produces an informational palette with no
+executable selection. M0/M1/M2 implementations remain parallel entrypoints.
+
+IGlobalShortcut exposes start(explicitEnable), stop, status and activated.
+The platform factory chooses by Qt backend: xcb → X11, wayland* → portal, otherwise
+unavailable. The fixed display label and action ID are centralized in its header.
+X11 uses one worker, dedicated X display, passive Ctrl+Alt+P grabs and Caps/Num
+modifier variants. It waits in blocking poll on the X fd and a shutdown pipe, not
+on the GUI thread. Scoped X error trapping detects collision; cleanup releases
+all grabs on its own connection. No general key event subscription is installed.
+
+PortalGlobalShortcut is a state machine over PortalTransport. QtPortalTransport
+uses asynchronous Qt DBus messages for version probe, CreateSession and BindShortcuts,
+and subscribes to tokenized Response paths before calling methods. It supports v1
+operations, checks exact session/action IDs and shows the returned trigger description.
+Cancellation/error closes request/session; generation counters ignore stale replies.
+Session closure, service-owner change and bus disconnect disable registration.
+A bounded pending-request timer covers an abandoned configuration dialog.
+Version probe may occur on enabled startup, but binding requires explicit enable/retry.
+No v2-only ConfigureShortcuts dependency is introduced.
+
+InstanceCoordinator uses a private user runtime subdirectory, a primary-lifetime
+QLockFile and a filesystem QLocalServer with UserAccessOption. Linux additionally
+checks SO_PEERCRED uid. Only exact trigger/open newline frames are accepted; frames
+are bounded, idle clients time out and concurrent connections are capped. IPC
+contains commands only, no text or credentials. Forwarding requires an acknowledgement.
+Only the lifetime-lock owner can remove a confirmed unreachable stale endpoint.
+A starting/unresponsive live primary causes a clear failure/retry, never a second
+tray process or removal of its socket. CLI startup waits are bounded; resident
+operation is signal-driven. Normal second launch opens the existing workspace.
+
+References:
+[GlobalShortcuts v1-compatible API](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html),
+[request response lifecycle](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Request.html),
+[shortcut syntax](https://specifications.freedesktop.org/shortcuts/latest/),
+[local socket access options](https://doc.qt.io/qt-6/qlocalserver.html#SocketOption-enum).

@@ -51,3 +51,25 @@ and stored in QSettings, alongside the existing model/language keys.
 Clipboard contents are untouched until an explicit Copy result. No global input
 hooks, input injection, automatic replacement, message sending, profile collection,
 new AI provider or selection history is added.
+
+## M3 explicit manual fallback
+
+Shortcut activation and --trigger are local consent to read/preview, not consent
+to upload. On explicit trigger only, the resolver tries cached AT-SPI, read-only
+X11 PRIMARY where supported, then Clipboard. The palette visibly identifies its
+source so a user can reject stale clipboard data. The complete value snapshot is
+preserved behind the bounded local preview; only a feature click sends it to AI.
+
+No periodic PRIMARY/clipboard reads, change listener, history or content logging
+is introduced. Closing/hiding the palette clears its snapshot and preview.
+Shortcut settings are independent of automatic toolbar settings. The default is
+OFF; portal permission/configuration UI requires explicit enable/retry.
+
+X11 observes only the registered key combination, not general keyboard content.
+XTest belongs solely to the integration-test target; it is not linked by the
+production shortcut backend. No production input injection, automatic paste,
+replacement or message sending is implemented.
+
+Single-instance IPC uses only a user-restricted local socket and commands, no
+public TCP port. Linux peer uid is checked. No selected text or API key crosses
+this IPC channel. The existing Secret Service storage remains unchanged.
