@@ -38,7 +38,10 @@ bool AppController::run(Feature feature) {
     }
     return runText(feature, captured_->text);
 }
-bool AppController::runSelection(Feature, const Selection&) { return false; }
+bool AppController::runSelection(Feature feature, const Selection& selection) {
+    if (selection.text.trimmed().isEmpty()) return false;
+    return runText(feature, selection.text);
+}
 bool AppController::testConnection() { return runText(Feature::PlainSpeak, "This is a connection test. Reply with OK."); }
 bool AppController::runText(Feature feature, const QString& text) {
     if (busy()) return false;

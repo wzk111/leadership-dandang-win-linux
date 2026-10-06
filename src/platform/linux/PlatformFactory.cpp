@@ -1,7 +1,9 @@
 #include "../PlatformFactory.h"
 #include "LinuxSecretStore.h"
 #include "AtSpiSelectionMonitor.h"
+#include "LinuxWindowPolicy.h"
 namespace ws {
+std::unique_ptr<IPlatformWindowPolicy> createWindowPolicy() { return std::make_unique<LinuxWindowPolicy>(); }
 void preparePlatformEventLoop() { qputenv("QT_NO_GLIB", "1"); }
 std::unique_ptr<ISelectionMonitor> createSelectionMonitor() {
     return std::make_unique<AtSpiSelectionMonitor>(createAtSpiSession());

@@ -9,8 +9,8 @@
 int main(int argc, char** argv) {
     ws::preparePlatformEventLoop();
     QApplication app(argc, argv);
-    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.2.0");
-    QCommandLineParser parser; parser.setApplicationDescription("Explicit clipboard AI assistant");
+    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.3.0");
+    QCommandLineParser parser; parser.setApplicationDescription("Explicit selection AI assistant");
     parser.addHelpOption(); parser.addVersionOption();
     parser.addOption({"smoke-test", "Open windows with synthetic data, make no network calls, then exit."});
     parser.process(app);
@@ -20,7 +20,8 @@ int main(int argc, char** argv) {
     ws::OpenAIProvider ai;
     ws::AppController controller(ai, *secrets, clipboard, settings);
     auto monitor = ws::createSelectionMonitor();
-    ws::Application application(controller, *secrets, settings, monitor.get());
+    auto windowPolicy = ws::createWindowPolicy();
+    ws::Application application(controller, *secrets, settings, monitor.get(), windowPolicy.get());
     application.start();
     if (parser.isSet("smoke-test")) {
         QTimer::singleShot(0, &app, [&] {

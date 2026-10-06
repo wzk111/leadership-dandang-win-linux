@@ -1,4 +1,4 @@
-name: Ubuntu M1
+name: Ubuntu M2
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
@@ -10,7 +10,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core xvfb dbus-x11 gnome-keyring
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core xvfb dbus-x11 gnome-keyring libx11-dev openbox
       - run: /usr/bin/cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: /usr/bin/cmake --build build --parallel 2
       - name: Tests
@@ -23,3 +23,6 @@ jobs:
         run: |
           dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/test_atspi_runtime realEvents
           env AT_SPI_BUS_ADDRESS=unix:path=/nonexistent/worksidekick-test-bus ./build/test_atspi_runtime unavailableRegistry
+
+      - name: X11 overlay focus and placement
+        run: dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 bash scripts/test-overlay.sh

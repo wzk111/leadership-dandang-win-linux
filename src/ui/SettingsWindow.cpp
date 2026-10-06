@@ -8,6 +8,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QCloseEvent>
+#include <QCheckBox>
+#include <QSignalBlocker>
 namespace ws {
 SettingsWindow::SettingsWindow(QSettings& settings, ISecretStore& secrets, QWidget* parent)
     : QWidget(parent), settings_(settings), secrets_(secrets) {
@@ -24,6 +26,12 @@ SettingsWindow::SettingsWindow(QSettings& settings, ISecretStore& secrets, QWidg
     key_->setMaxLength(4096); key_->setPlaceholderText("Enter a new key to save securely");
     form->addRow("Provider", provider); form->addRow("Model", model_); form->addRow("Output language", language_);
     form->addRow("API key", key_); layout->addLayout(form);
+    automaticPopup_ = new QCheckBox("Automatic selection toolbar", this);
+    automaticPopup_->setObjectName("automaticPopup");
+    automaticPopup_->setChecked(settings_.value("ui/automaticPopup", false).toBool());
+    automaticPopup_->setToolTip("Applies immediately. Available on supported backends; see Diagnostics. Selecting text never uploads it.");
+    layout->addWidget(automaticPopup_);
+    connect(automaticPopup_, &QCheckBox::toggled, this, &SettingsWindow::automaticPopupChanged);
     auto* keyRow = new QHBoxLayout;
     saveKey_ = new QPushButton("Save API key securely", this); saveKey_->setObjectName("saveKey");
     removeKey_ = new QPushButton("Delete saved key", this); removeKey_->setObjectName("deleteKey");
@@ -52,6 +60,9 @@ SettingsWindow::SettingsWindow(QSettings& settings, ISecretStore& secrets, QWidg
     connect(&secrets_, &ISecretStore::writeFinished, this, [this](bool, const QString& message) {
         saveKey_->setEnabled(true); removeKey_->setEnabled(true); status_->setText(message);
     });
+}
+void SettingsWindow::setAutomaticPopupChecked(bool enabled) {
+    QSignalBlocker block(automaticPopup_); automaticPopup_->setChecked(enabled);
 }
 void SettingsWindow::closeEvent(QCloseEvent* event) {
     key_->clear(); QWidget::closeEvent(event);

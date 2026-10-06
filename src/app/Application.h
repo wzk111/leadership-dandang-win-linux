@@ -9,6 +9,7 @@
 #include "ui/SettingsWindow.h"
 #include "ui/ResultCard.h"
 #include "ui/SelectionDiagnostics.h"
+#include "ui/ActionBar.h"
 class QPlainTextEdit;
 class QLabel;
 namespace ws {
@@ -23,6 +24,18 @@ public:
     bool smokeCheck();
 private:
     void refreshDiagnostics();
+    void setupOverlay();
+    void setAutomaticPopup(bool enabled);
+    void showSelectionToolbar(const Selection& selection);
+    void refreshOverlayDiagnostics();
+    IPlatformWindowPolicy* windowPolicy_;
+    ActionBar actionBar_;
+    QAction* automaticAction_ = nullptr;
+    QPlainTextEdit* overlayText_ = nullptr;
+    bool policyConfigured_ = false;
+    std::optional<QRect> lastAnchor_;
+    std::optional<BarPlacement> lastPlacement_;
+    QString overlayStatus_ = "Waiting for selection";
     ISelectionMonitor* monitor_;
     SelectionDiagnostics* selectionPanel_;
     AppController& controller_;
