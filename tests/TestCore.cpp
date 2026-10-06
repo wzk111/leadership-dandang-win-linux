@@ -8,11 +8,11 @@ class TestCore : public QObject {
 private slots:
     void features() {
         const auto list = FeatureRegistry::all();
-        QCOMPARE(list.size(), 3);
+        QCOMPARE(list.size(), 6);
         QCOMPARE(list[0].name, QString("Plain Speak"));
         QCOMPARE(list[1].id, Feature::Summarize);
         QCOMPARE(list[2].id, Feature::Polish);
-        for (const auto& f : list) { QVERIFY(!f.requiresProfile); QVERIFY(!f.description.isEmpty()); }
+        for (const auto& f : list) { if (int(f.id)<3) QVERIFY(!f.requiresProfile); QVERIFY(!f.description.isEmpty()); }
     }
     void promptIsolation() {
         for (const auto& f : {Feature::PlainSpeak, Feature::Summarize, Feature::Polish}) {
@@ -42,7 +42,8 @@ private slots:
         const auto restored = Settings::load(store);
         QCOMPARE(restored.model, s.model);
         QCOMPARE(restored.outputLanguage, s.outputLanguage);
-        QCOMPARE(store.allKeys().size(), 2);
+        QVERIFY(store.contains("ai/openai/model"));
+        QCOMPARE(store.value("ai/provider").toString(),QString("openai"));
         QVERIFY(!store.contains("apiKey"));
     }
 };
