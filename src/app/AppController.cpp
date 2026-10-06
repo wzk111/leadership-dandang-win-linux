@@ -75,3 +75,5 @@ void AppController::cancel() {
     ai_.cancel();
 }
 }
+
+namespace ws { bool AppController::generateReply(const Selection&,const QString&,const QString&) {return false;} bool AppController::refine(const QString&) {return false;} void AppController::clearGeneration() {} }

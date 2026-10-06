@@ -1,5 +1,6 @@
 #pragma once
 #include <QObject>
+#include "core/GenerationContext.h"
 #include "ai/IAIProvider.h"
 #include "platform/ISecretStore.h"
 #include "platform/ISelectionProvider.h"
@@ -12,10 +13,15 @@ public:
     bool captureClipboard();
     bool run(Feature feature);
     bool runSelection(Feature feature, const Selection& selection);
+    bool generateReply(const Selection&, const QString&, const QString&);
+    bool refine(const QString&);
+    void clearGeneration();
+    const std::optional<GenerationContext>& generationContext() const {return context_;}
     bool testConnection();
     void cancel();
     bool busy() const;
 signals:
+    void replyRequested(const ws::Selection& selection);
     void captured(const QString& text);
     void loading();
     void finished(const ws::AIResult& result);
@@ -28,5 +34,6 @@ private:
     std::optional<Selection> captured_;
     AIRequest pendingRequest_;
     bool awaitingSecret_ = false;
+    std::optional<GenerationContext> context_;
 };
 }

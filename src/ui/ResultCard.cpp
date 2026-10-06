@@ -26,7 +26,7 @@ ResultCard::ResultCard(QWidget* parent) : QWidget(parent) {
     connect(cancel_, &QPushButton::clicked, this, &ResultCard::cancelRequested);
     connect(close, &QPushButton::clicked, this, &QWidget::close);
 }
-void ResultCard::loading() {
+void ResultCard::loading(bool) {
     text_->clear(); status_->setText("Working…"); copy_->setEnabled(false); cancel_->setEnabled(true);
     show(); raise();
 }
@@ -34,7 +34,7 @@ void ResultCard::success(const QString& text) {
     text_->setPlainText(text); status_->setText("Ready — review before using.");
     copy_->setEnabled(!text.isEmpty()); cancel_->setEnabled(false); show();
 }
-void ResultCard::error(const QString& message) {
+void ResultCard::error(const QString& message,bool) {
     text_->clear(); status_->setText(message); copy_->setEnabled(false); cancel_->setEnabled(false); show();
 }
 void ResultCard::closeEvent(QCloseEvent* event) {
