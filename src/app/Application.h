@@ -10,15 +10,18 @@
 #include "ui/ResultCard.h"
 #include "ui/SelectionDiagnostics.h"
 #include "ui/ActionBar.h"
+#include "ui/ManualActionPalette.h"
+#include "platform/IGlobalShortcut.h"
 class QPlainTextEdit;
 class QLabel;
 namespace ws {
 class Application : public QObject {
     Q_OBJECT
 public:
-    Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor = nullptr, IPlatformWindowPolicy* policy = nullptr);
+    Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor = nullptr, IPlatformWindowPolicy* policy = nullptr, IExplicitSelectionResolver* resolver = nullptr, IGlobalShortcut* shortcut = nullptr);
     ~Application() override;
     void start();
+    void triggerManualActions();
     void openSettings();
     void openDiagnostics();
     bool smokeCheck();

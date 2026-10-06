@@ -11,7 +11,7 @@
 #include <QStyle>
 #include <QSysInfo>
 namespace ws {
-Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor, IPlatformWindowPolicy* policy)
+Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor, IPlatformWindowPolicy* policy, IExplicitSelectionResolver*, IGlobalShortcut*)
     : windowPolicy_(policy), monitor_(monitor), controller_(controller), secrets_(secrets), settingsStore_(settings), settings_(settings, secrets) {
     auto showWorkspace = [this] { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); };
     connect(&workspace_, &WorkspaceWindow::processClipboard, &controller_, &AppController::captureClipboard);
@@ -76,6 +76,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     setupOverlay();
 }
 Application::~Application() { if (monitor_) monitor_->stop(); }
+void Application::triggerManualActions() {}
 void Application::start() {
     if (monitor_) monitor_->start();
     const bool available = QSystemTrayIcon::isSystemTrayAvailable();
