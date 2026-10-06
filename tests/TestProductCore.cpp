@@ -8,6 +8,31 @@ using namespace ws;
 class TestProductCore : public QObject {
  Q_OBJECT
 private slots:
+ void contextBounds() {
+    PromptRequest r{Feature::Reply,"source","Same as input",QString(8000,'p')};
+    r.userIntent=QString(2000,'i');r.previousResult=QString(4*1024*1024,'r');r.refinementInstruction="Shorter";
+    QVERIFY(PromptBuilder::build(r).error.isEmpty());
+    r.profile+='p';QVERIFY(!PromptBuilder::build(r).error.isEmpty());r.profile.chop(1);
+    r.userIntent+='i';QVERIFY(!PromptBuilder::build(r).error.isEmpty());r.userIntent.chop(1);
+    r.previousResult+='r';QVERIFY(!PromptBuilder::build(r).error.isEmpty());r.previousResult.clear();
+    QVERIFY(!PromptBuilder::build(r).error.isEmpty());
+    for(const auto& f:FeatureRegistry::all())QVERIFY(PromptBuilder::build({f.id,"source","Same as input",{}}).system.contains("same language"));
+ }
+ void allProfileLimits() {
+    const QList<QPair<QString Profile::*,int>> fields{{&Profile::displayName,100},{&Profile::role,200},{&Profile::team,200},
+        {&Profile::responsibilities,2000},{&Profile::currentProjects,2000},{&Profile::communicationPreferences,1000},{&Profile::additionalContext,2000}};
+    Profile total;
+    for(const auto& f:fields) {Profile p;p.*f.first=QString(f.second,'x');QVERIFY(p.valid());(p.*f.first)+='x';QVERIFY(!p.valid());total.*f.first=QString(f.second,'x');}
+    QVERIFY(total.valid());QVERIFY(total.serialize().size()<=8000);QVERIFY(!total.serialize().isEmpty());
+    QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);s.setValue("profile/team",QString(201,'x'));
+    QVERIFY(Profile::load(s).serialize().isEmpty());
+ }
+ void migrationDoesNotOverwriteNewConfig() {
+    QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);
+    s.setValue("ai/model","legacy");s.setValue("ai/openai/model","new");s.setValue("output/language","日本語");
+    QCOMPARE(Settings::load(s).model,QString("new"));QCOMPARE(Settings::load(s).outputLanguage,QString("日本語"));
+    QCOMPARE(s.value("ai/model").toString(),QString("legacy"));QCOMPARE(s.value("ai/openai/model").toString(),QString("new"));
+ }
  void registry() {
     auto all=FeatureRegistry::all();QCOMPARE(all.size(),6);
     QSet<QString> ids;

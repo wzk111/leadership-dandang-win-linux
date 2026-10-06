@@ -4,7 +4,7 @@ static FeaturePreferences normalize(FeaturePreferences p) {
     QStringList enabled,quick;
     for(const auto& id:p.enabled)if(FeatureRegistry::fromId(id) && !enabled.contains(id))enabled<<id;
     for(const auto& id:p.quickActions)if(enabled.contains(id) && !quick.contains(id) && quick.size()<5)quick<<id;
-    for(const auto& id:enabled)if(quick.size()<qMin(3,enabled.size()) && !quick.contains(id))quick<<id;
+    for(const auto& id:enabled)if(quick.size()<qMin<qsizetype>(3,enabled.size()) && !quick.contains(id))quick<<id;
     return {enabled,quick};
 }
 FeaturePreferences FeaturePreferences::load(QSettings& s) {
