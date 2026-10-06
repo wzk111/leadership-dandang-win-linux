@@ -1,8 +1,9 @@
 # WorkSidekick
 
-A C++20 / Qt 6 desktop assistant for text you explicitly copy. M0 provides
-**Plain Speak**, **Summarize**, and **Polish** using the official OpenAI Responses
-API. Review the result, then copy it yourself.
+A C++20 / Qt 6 desktop assistant for explicitly chosen text. On supported Linux
+backends, select text and click **Plain Speak**, **Summarize**, or **Polish** on the
+floating toolbar. Manual clipboard mode remains available. Review the result,
+then copy it yourself. AI uses the official OpenAI Responses API.
 
 **Target:** Ubuntu 22.04 LTS. Native Windows integration is planned for M5.
 This is an independent implementation inspired by
@@ -17,7 +18,7 @@ Run these commands in an Ubuntu desktop terminal:
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build pkg-config \
-  qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core gnome-keyring
+  qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core gnome-keyring libx11-dev
 
 git clone https://github.com/wzk111/leadership-dandang-win-linux.git
 cd leadership-dandang-win-linux
@@ -46,7 +47,7 @@ use XWayland. Actual platform/session information appears in Diagnostics.
 
 M0 manual clipboard AI mode remains available and is accepted. M1 adds AT-SPI2
 selection detection under Linux, using only accessibility selection events.
-**Selecting text never calls AI and never opens a floating toolbar.**
+**Selecting text never calls AI. M2 can show the local toolbar when enabled.**
 
 Open Diagnostics, select text in another accessible application, then use
 **Test Selection** to inspect event count, application, character count and raw
@@ -56,9 +57,37 @@ Stop monitoring clears the cache; latest text also expires after 45 seconds.
 
 Support depends on each application's accessibility implementation under both
 X11 and Wayland. See [M1 acceptance](docs/m1-completion.md) and the
-[compatibility matrix](docs/linux-selection-compatibility.md). M2 is not implemented.
+[compatibility matrix](docs/linux-selection-compatibility.md). M2 overlay evidence is recorded separately.
 
-## First use
+## M2: selection → ActionBar → explicit AI action
+
+Configure your model and secure API key using the first-use steps below. In
+Settings, enable **Automatic selection toolbar**, or check **Enable Automatic
+Toolbar** in the tray menu. The preference applies immediately and defaults **OFF**.
+
+On Qt **xcb** (X11, or an XWayland attempt), select text in an accessible application.
+A compact toolbar appears above the selection, or below when needed, and stays
+within the selected screen's available area. Click **Plain Speak**, **Summarize** or
+**Polish** to process that exact captured selection. No clipboard copy is required.
+Only **Copy result** replaces clipboard contents.
+
+**Displaying the toolbar never sends an AI request.** A newer selection replaces
+the snapshot; clear/expiry, dismiss, monitoring failure, disabling, or an in-flight
+AI request hides the bar. Enabling waits for a new selection. Dismiss does not
+disable future popups.
+
+On native Qt **wayland / wayland-egl**, anchored automatic popup is disabled.
+AT-SPI diagnostics continue; use **Process Clipboard** for AI. Qt backend and
+desktop session are reported separately in Diagnostics. No compositor-specific
+workaround, global shortcut, input injection or X11 PRIMARY fallback is included.
+
+Missing anchor geometry keeps the M1 local selection available but prevents
+automatic placement. HiDPI, fractional/mixed scaling, real multi-monitor behavior
+and real GNOME app compatibility are **NOT TESTED**.
+See [M2 verification](docs/m2-completion.md) and
+[overlay compatibility](docs/m2-overlay-compatibility.md).
+
+## First use / manual clipboard mode
 
 1. Launch the app and open **Settings**.
 2. Enter a Responses-compatible model ID available to your OpenAI API project.
@@ -101,12 +130,13 @@ native AT-SPI metadata is shown in the selection panel.
 - **M0:** manual clipboard, three actions, settings, secure keys, asynchronous API,
   result/copy/cancel, diagnostics and tray.
 - **M1:** local AT-SPI detection and explicit diagnostic preview.
-- **M2–M3:** automatic popup, X11 fallback and global shortcuts.
+- **M2:** non-activating selection ActionBar on supported backends.
+- **M3:** Linux fallback and global shortcuts.
 - **M4:** reply/profile/features and additional AI providers.
 - **M5:** native Windows integrations.
 
-M1 adds local AT-SPI selection detection. Automatic popup and Ctrl+Alt+P are **not implemented**.
-X11 PRIMARY is not read. To use AI on either X11 or Wayland, manually copy text first.
+M2 adds optional automatic popup on Qt xcb. Ctrl+Alt+P is **not implemented**.
+X11 PRIMARY is not read. Manual clipboard mode remains available on either X11 or Wayland.
 No GNOME settings are changed. Windows CMake configurations expose shared library/test targets, but Windows
 builds are NOT TESTED. M0 does not produce a native Windows application.
 
@@ -118,12 +148,13 @@ controller and end-to-end tests. All network tests use local synthetic responses
 For a headless Ubuntu machine:
 
 ```bash
-sudo apt install -y xvfb dbus-x11
+sudo apt install -y xvfb dbus-x11 libx11-dev openbox
 xvfb-run -a ctest --test-dir build --output-on-failure
 dbus-run-session -- bash scripts/test-keyring.sh
 xvfb-run -a ./build/worksidekick --smoke-test
 dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/test_atspi_runtime realEvents
 env AT_SPI_BUS_ADDRESS=unix:path=/nonexistent/worksidekick-test-bus ./build/test_atspi_runtime unavailableRegistry
+dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 bash scripts/test-overlay.sh
 ```
 
 The keyring script creates an isolated temporary HOME/keyring and uses synthetic
@@ -132,7 +163,7 @@ Smoke mode opens the windows using synthetic data, sends nothing and exits.
 
 [Ubuntu CI](https://github.com/wzk111/leadership-dandang-win-linux/actions/workflows/ubuntu.yml)
 builds with Ubuntu's system CMake and Qt 6.2, then runs these checks.
-See [M1 verification](docs/m1-completion.md) and [M0 verification](docs/m0-completion.md) for evidence and **NOT TESTED**
+See [M2 verification](docs/m2-completion.md), [M1 verification](docs/m1-completion.md) and [M0 verification](docs/m0-completion.md) for evidence and **NOT TESTED**
 items. CI is not a substitute for a GNOME desktop and a live API account.
 
 ## Privacy and documentation
@@ -147,6 +178,7 @@ scrapes apps, records clipboard history or monitors input.
 - [Troubleshooting](docs/troubleshooting.md)
 - [Linux compatibility](docs/linux-selection-compatibility.md)
 - [Windows compatibility](docs/windows-selection-compatibility.md)
-- [Implementation plan](docs/m0-plan.md)
+- [M2 specification](docs/M2_SPEC.md)
+- [M2 implementation plan](docs/m2-plan.md)
 
 No project license has been selected yet; no open-source license grant is implied.

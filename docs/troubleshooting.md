@@ -87,3 +87,38 @@ dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 ./build/t
 
 This starts a separate synthetic Qt text editor. It requires the development/test
 build and desktop accessibility bus packages. It performs no external API calls.
+
+## M2 toolbar does not appear
+
+Automatic selection toolbar defaults OFF. Enable it in Settings (applies immediately)
+or the tray's Enable Automatic Toolbar. Then make a new selection; enabling does not
+replay a previously cached selection. Dismiss hides this selection only.
+Disabling hides the toolbar while leaving M1 diagnostics monitoring active.
+
+Check Diagnostics for Qt platform, capability and overlay status. On xcb, a
+running AT-SPI monitor, nonempty selection and valid anchor are required.
+No anchor rectangle means text is still cached for M1 local diagnostics, but no
+automatic toolbar can be placed. A busy AI request hides the toolbar; finish/cancel
+and make a new selection. Stop/unavailable/45-second expiry clears the toolbar.
+
+Native Qt wayland / wayland-egl deliberately disables anchored automatic toolbar
+positioning. AT-SPI diagnostics and manual Process Clipboard remain available.
+A Wayland desktop running Qt xcb is an XWayland attempt, not verified native
+Wayland placement. No compositor hacks or privileged input helpers are used.
+
+## M2 placement or focus differs on your desktop
+
+Include session, Qt backend, raw anchor, requested placement and scaling settings
+from Diagnostics. Do not include private text. HiDPI, mixed DPI, fractional scaling,
+physical multi-monitor and real GNOME apps are NOT TESTED. Window-manager behavior
+can vary; disabling the toolbar preserves manual mode.
+
+Synthetic X11 focus testing additionally requires test-only packages
+`libx11-dev openbox xvfb dbus-x11`:
+
+```bash
+dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 bash scripts/test-overlay.sh
+```
+
+This launches Openbox inside the isolated Xvfb display and a synthetic accessible
+fixture; do not run it directly on your normal desktop DISPLAY. It uses no paid API.

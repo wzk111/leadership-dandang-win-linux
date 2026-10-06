@@ -6,7 +6,7 @@
   test. M0 has no automatic monitoring, hooks, accessibility scanning or uploads.
 - Requests contain the selected preview and action instructions. No profile,
   screenshots, app contents, clipboard history or conversation history is sent.
-- API keys use libsecret/Secret Service. Settings contain only model and language.
+- API keys use libsecret/Secret Service. Settings contain model, language and the automatic-toolbar preference.
   The key field is masked and cleared after save and on close.
 - Requests use the fixed official HTTPS endpoint, normal TLS validation and no
   automatic redirects. Tests inject only a loopback HTTP endpoint.
@@ -34,3 +34,20 @@ metadata; Show Last Selection Preview is required to display it. Preview clears
 on change/stop/expiry/hide. No selected text is logged, persisted or copied by M1.
 This updates the earlier M0-only statement that the app has no automatic monitor;
 there is still no keyboard monitoring, general text-change listener or scraping.
+
+## M2 explicit selection action
+
+Automatic toolbar display is local and is not permission to upload. Only a
+Plain Speak, Summarize or Polish click sends the captured toolbar Selection
+through the existing AI pipeline. New selections replace the stored value; a
+hidden/cleared toolbar cannot execute a stale selection. No accessibility or
+clipboard read is performed when clicking the toolbar.
+
+The toolbar shows feature labels, not source text. Diagnostics automatically
+shows capability, raw rectangle, requested placement and status only. The M1
+opt-in preview remains separate. The automatic-popup preference is non-sensitive
+and stored in QSettings, alongside the existing model/language keys.
+
+Clipboard contents are untouched until an explicit Copy result. No global input
+hooks, input injection, automatic replacement, message sending, profile collection,
+new AI provider or selection history is added.

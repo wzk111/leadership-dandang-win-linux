@@ -6,7 +6,7 @@ flowchart TD
   Selection --> Controller[AppController]
   Workspace[Workspace / Settings / Diagnostics] --> Controller
   Controller --> Prompts[PromptBuilder + FeatureRegistry]
-  Controller --> Settings[QSettings: model and language only]
+  Controller --> Settings[QSettings: model, language, popup preference]
   Controller --> Secrets[ISecretStore]
   Secrets --> Linux[Linux libsecret worker]
   Controller --> AI[IAIProvider]
@@ -61,3 +61,51 @@ The M0 description above records the preserved baseline. M1 adds an independent
 AT-SPI monitor feeding local Diagnostics, without replacing the clipboard provider.
 See [M1 architecture](m1-architecture.md) for the worker/GLib event loop strategy,
 RAII ownership, bounded extraction, debounce and explicit preview lifecycle.
+
+## M2 selection ActionBar
+
+Application connects the M1 monitor to one value-member ActionBar. ActionBar
+contains only FeatureRegistry buttons and an optional Selection value. Its click
+handler copies that value, hides/clears the bar, then emits featureChosen.
+Application calls AppController::runSelection, which reuses runText. Neither the
+bar nor the controller queries AT-SPI or clipboard during this action.
+
+```mermaid
+flowchart LR
+  Monitor[AT-SPI selection snapshot] --> App[Application]
+  App --> Bar[ActionBar: local only]
+  Policy[LinuxWindowPolicy] --> Bar
+  Bar -->|explicit click + copied Selection| Controller[AppController.runSelection]
+  Clipboard[Manual clipboard capture] --> Controller
+  Controller --> AI[Existing prompt / AI pipeline]
+  AI --> Result[Existing ResultCard]
+```
+
+IPlatformWindowPolicy separates window capability/configuration/placement from
+AI and text semantics. LinuxWindowPolicy detects QGuiApplication::platformName:
+xcb is AnchoredNonActivating (including a Qt xcb process on a Wayland desktop);
+native wayland* and other backends are Unsupported. No unanchored experimental
+mode or compositor-specific integration is added.
+
+The Qt flags are Tool, FramelessWindowHint, WindowStaysOnTopHint and
+WindowDoesNotAcceptFocus; WA_ShowWithoutActivating and NoFocus buttons accompany
+them. Automatic display does not activate, raise, requestActivate or setFocus.
+The integration test measures X11 system focus; real GNOME behavior is separate.
+
+ActionBarPlacement is pure geometry: horizontal center above selection with an
+8px gap, below if above would cross the screen top, then clamp to availableGeometry.
+The policy chooses screenAt(anchor center), then primaryScreen. It preserves raw
+AT-SPI coordinates and does not invent scaling conversion. If the bar cannot fit
+the screen, placement fails and no toolbar shows. Diagnostics labels placement
+as requested Qt geometry, not proof of actual compositor positioning.
+
+QSettings gains only ui/automaticPopup (default false). Settings and tray update
+it immediately, independently of model/key settings. Disabling hides the bar but
+does not stop the monitor; enabling waits for a new selection. Clear/expiry,
+monitor stop/unavailable, dismiss, loading and unsupported/missing placement hide
+and clear the toolbar snapshot. Busy controller actions cannot overlap. No second
+expiry/history mechanism exists. Last anchor/placement metadata retains no text.
+
+Qt references: [window flags and attributes](https://doc.qt.io/qt-6/qt.html#WindowType-enum)
+and [screenAt](https://doc.qt.io/qt-6/qguiapplication.html#screenAt).
+See [M2 completion](m2-completion.md) and [overlay matrix](m2-overlay-compatibility.md).
