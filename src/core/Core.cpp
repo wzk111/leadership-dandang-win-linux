@@ -36,3 +36,5 @@ bool Settings::save(QSettings& store) const {
     return store.status() == QSettings::NoError;
 }
 }
+
+namespace ws { FeatureInfo FeatureRegistry::info(Feature f) { for(const auto& i:all()) if(i.id==f)return i; return {}; } std::optional<Feature> FeatureRegistry::fromId(const QString&) {return {};} Settings Settings::forProvider(QSettings& s,const QString&) {return load(s);} }
