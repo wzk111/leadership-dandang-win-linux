@@ -20,13 +20,25 @@ class Application : public QObject {
 public:
     Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor = nullptr, IPlatformWindowPolicy* policy = nullptr, IExplicitSelectionResolver* resolver = nullptr, IGlobalShortcut* shortcut = nullptr);
     ~Application() override;
-    void start();
+    void start(bool showWorkspace = true);
+    void openWorkspace();
     void triggerManualActions();
     void openSettings();
     void openDiagnostics();
     bool smokeCheck();
 private:
     void refreshDiagnostics();
+    void setupManual();
+    void setShortcutEnabled(bool enabled);
+    void refreshManualDiagnostics();
+    IExplicitSelectionResolver* resolver_;
+    IGlobalShortcut* shortcut_;
+    ManualActionPalette manualPalette_;
+    QAction* shortcutAction_ = nullptr;
+    QPlainTextEdit* manualText_ = nullptr;
+    QString lastManualSource_ = "none";
+    qsizetype lastManualCharacters_ = 0;
+    QDateTime lastManualTrigger_;
     void setupOverlay();
     void setAutomaticPopup(bool enabled);
     void showSelectionToolbar(const Selection& selection);

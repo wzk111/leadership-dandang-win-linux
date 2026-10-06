@@ -32,6 +32,15 @@ SettingsWindow::SettingsWindow(QSettings& settings, ISecretStore& secrets, QWidg
     automaticPopup_->setToolTip("Applies immediately. Available on supported backends; see Diagnostics. Selecting text never uploads it.");
     layout->addWidget(automaticPopup_);
     connect(automaticPopup_, &QCheckBox::toggled, this, &SettingsWindow::automaticPopupChanged);
+    globalShortcut_ = new QCheckBox("Enable global shortcut", this);
+    globalShortcut_->setObjectName("globalShortcut");
+    globalShortcut_->setChecked(settings_.value("shortcut/enabled",false).toBool());
+    layout->addWidget(globalShortcut_);
+    connect(globalShortcut_,&QCheckBox::toggled,this,&SettingsWindow::globalShortcutChanged);
+    auto* configureShortcut = new QPushButton("Register / retry shortcut",this);
+    configureShortcut->setToolTip("May open desktop permission/configuration UI. Native Wayland requires an explicit retry after restart.");
+    layout->addWidget(configureShortcut);
+    connect(configureShortcut,&QPushButton::clicked,this,&SettingsWindow::configureShortcutRequested);
     auto* keyRow = new QHBoxLayout;
     saveKey_ = new QPushButton("Save API key securely", this); saveKey_->setObjectName("saveKey");
     removeKey_ = new QPushButton("Delete saved key", this); removeKey_->setObjectName("deleteKey");
@@ -63,6 +72,9 @@ SettingsWindow::SettingsWindow(QSettings& settings, ISecretStore& secrets, QWidg
 }
 void SettingsWindow::setAutomaticPopupChecked(bool enabled) {
     QSignalBlocker block(automaticPopup_); automaticPopup_->setChecked(enabled);
+}
+void SettingsWindow::setGlobalShortcutChecked(bool enabled) {
+    QSignalBlocker block(globalShortcut_); globalShortcut_->setChecked(enabled);
 }
 void SettingsWindow::closeEvent(QCloseEvent* event) {
     key_->clear(); QWidget::closeEvent(event);

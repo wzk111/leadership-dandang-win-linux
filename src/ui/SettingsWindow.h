@@ -14,14 +14,18 @@ class SettingsWindow : public QWidget {
 public:
     SettingsWindow(QSettings& settings, ISecretStore& secrets, QWidget* parent = nullptr);
     void setAutomaticPopupChecked(bool enabled);
+    void setGlobalShortcutChecked(bool enabled);
 signals:
     void automaticPopupChanged(bool enabled);
+    void globalShortcutChanged(bool enabled);
+    void configureShortcutRequested();
 protected:
     void closeEvent(QCloseEvent* event) override;
 private:
     QSettings& settings_;
     ISecretStore& secrets_;
     QCheckBox* automaticPopup_;
+    QCheckBox* globalShortcut_;
     QLineEdit* model_;
     QComboBox* language_;
     QLineEdit* key_;

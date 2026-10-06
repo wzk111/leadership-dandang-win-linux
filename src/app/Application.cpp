@@ -11,8 +11,8 @@
 #include <QStyle>
 #include <QSysInfo>
 namespace ws {
-Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor, IPlatformWindowPolicy* policy, IExplicitSelectionResolver*, IGlobalShortcut*)
-    : windowPolicy_(policy), monitor_(monitor), controller_(controller), secrets_(secrets), settingsStore_(settings), settings_(settings, secrets) {
+Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor, IPlatformWindowPolicy* policy, IExplicitSelectionResolver* resolver, IGlobalShortcut* shortcut)
+    : resolver_(resolver), shortcut_(shortcut), windowPolicy_(policy), monitor_(monitor), controller_(controller), secrets_(secrets), settingsStore_(settings), settings_(settings, secrets) {
     auto showWorkspace = [this] { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); };
     connect(&workspace_, &WorkspaceWindow::processClipboard, &controller_, &AppController::captureClipboard);
     connect(&workspace_, &WorkspaceWindow::featureChosen, &controller_, &AppController::run);
@@ -33,7 +33,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     menu_.addAction("Settings", this, &Application::openSettings);
     menu_.addAction("Diagnostics", this, &Application::openDiagnostics);
     menu_.addAction("About", this, [this] {
-        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.3 — M2\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
+        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.4 — M3\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
     });
     menu_.addSeparator(); menu_.addAction("Quit", qApp, &QApplication::quit);
     tray_.setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
@@ -74,26 +74,29 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
         refreshDiagnostics();
     });
     setupOverlay();
+    setupManual();
 }
-Application::~Application() { if (monitor_) monitor_->stop(); }
-void Application::triggerManualActions() {}
-void Application::start() {
+Application::~Application() { if (shortcut_) shortcut_->stop(); if (monitor_) monitor_->stop(); }
+void Application::openWorkspace() { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); }
+void Application::start(bool showWorkspace) {
+    if (shortcut_ && settingsStore_.value("shortcut/enabled",false).toBool()) shortcut_->start(false);
     if (monitor_) monitor_->start();
     const bool available = QSystemTrayIcon::isSystemTrayAvailable();
     QApplication::setQuitOnLastWindowClosed(!available);
     workspace_.setTrayAvailable(available);
     if (available) tray_.show();
-    workspace_.show();
+    if (showWorkspace) workspace_.show();
 }
 void Application::openSettings() { settings_.show(); settings_.raise(); settings_.activateWindow(); }
 void Application::openDiagnostics() { refreshDiagnostics(); diagnostics_.show(); diagnostics_.raise(); }
 void Application::refreshDiagnostics() {
     refreshOverlayDiagnostics();
+    refreshManualDiagnostics();
     diagnosticsText_->setPlainText(QString(
-        "WorkSidekick 0.3 — M2\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
+        "WorkSidekick 0.4 — M3\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
         "Selection mode: AT-SPI toolbar / MANUAL CLIPBOARD\nAT-SPI runtime status: see local selection panel below\n"
-        "X11 selection backend: not implemented (M3)\nGlobalShortcuts portal: not probed (M3)\n"
-        "Registered shortcut: none (M3)\nAutomatic popup: see overlay panel\n"
+        "Manual fallback: see M3 panel\nPortal probe: on explicit enable / enabled startup\n"
+        "Shortcut status: see M3 panel\nAutomatic popup: see overlay panel\n"
         "Secret backend: %6\nLast key status: %7\nAI provider: OpenAI Responses\nModel configured: %8\n"
         "System tray detected: %9\nEndpoint: https://api.openai.com/v1/responses\nTimeout: 30 seconds")
         .arg(QSysInfo::prettyProductName(), qEnvironmentVariable("XDG_CURRENT_DESKTOP", "unknown"),
