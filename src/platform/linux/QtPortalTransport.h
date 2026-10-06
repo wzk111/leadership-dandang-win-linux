@@ -29,5 +29,6 @@ private:
     enum class Pending { Idle, Create, Bind };
     Pending pending_=Pending::Idle;
     quint64 generation_=0;
+    bool activationSubscribed_=false;
 };
 }

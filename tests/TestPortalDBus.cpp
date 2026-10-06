@@ -41,14 +41,12 @@ public:
 class TestPortalDBus : public QObject {
     Q_OBJECT
 private slots:
-    void observe(const QDBusMessage& message) { qWarning() << "Observed activation signature" << message.signature(); }
     void realAsyncProtocolWithFakeService() {
         qDBusRegisterMetaType<PortalBinding>(); qDBusRegisterMetaType<PortalBindings>();
         auto bus=QDBusConnection::sessionBus(); QVERIFY(bus.isConnected());
         const QString name="org.worksidekick.TestPortal";
         FakeService service; QVERIFY(bus.registerService(name));
         QVERIFY(bus.registerVirtualObject("/org/freedesktop/portal/desktop",&service,QDBusConnection::SubPath));
-        QVERIFY(bus.connect(name,"/org/freedesktop/portal/desktop","org.freedesktop.portal.GlobalShortcuts","Activated",this,SLOT(observe(QDBusMessage))));
         auto transport=std::make_unique<QtPortalTransport>(name);
         QVERIFY(transport->metaObject()->indexOfSlot("activated(QDBusObjectPath,QString,qulonglong,QVariantMap)")>=0);
         QSignalSpy rawActivation(transport.get(),&PortalTransport::activation);
@@ -64,9 +62,16 @@ private slots:
         QCOMPARE(rawActivation[0][1].toString(),ShortcutId);
         QTRY_COMPARE(activated.size(),1);
         shortcut.stop(); QTRY_VERIFY(service.closed>0); QVERIFY(!shortcut.status().registered);
+        shortcut.start(true); QTRY_VERIFY_WITH_TIMEOUT(shortcut.status().registered,5000);
+        auto closed=QDBusMessage::createSignal(service.session,"org.freedesktop.portal.Session","Closed");
+        closed<<QVariantMap{}; QVERIFY(bus.send(closed));
+        QTRY_VERIFY(!shortcut.status().registered); QVERIFY(!shortcut.status().available);
         service.reject=true; shortcut.start(true);
         QTRY_VERIFY_WITH_TIMEOUT(shortcut.status().description.contains("cancelled"),5000);
+        service.reject=false; shortcut.start(true);
+        QTRY_VERIFY_WITH_TIMEOUT(shortcut.status().registered,5000);
         bus.unregisterService(name);
+        QTRY_VERIFY(!shortcut.status().registered); QVERIFY(!shortcut.status().available);
         bus.unregisterObject("/org/freedesktop/portal/desktop",QDBusConnection::UnregisterTree);
         shortcut.start(true); QTRY_VERIFY_WITH_TIMEOUT(shortcut.status().description.contains("unavailable"),5000);
         QVERIFY(!shortcut.status().available);

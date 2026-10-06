@@ -13,18 +13,20 @@ static const QString ShortcutInterface="org.freedesktop.portal.GlobalShortcuts";
 static const QString RequestInterface="org.freedesktop.portal.Request";
 static const QString SessionInterface="org.freedesktop.portal.Session";
 QtPortalTransport::QtPortalTransport(QString service):service_(std::move(service)),bus_(QDBusConnection::sessionBus()) {
+    qRegisterMetaType<QDBusObjectPath>(); // Qt 6.2 requires the slot argument name before subscribing.
     qDBusRegisterMetaType<PortalBinding>(); qDBusRegisterMetaType<PortalBindings>();
     timeout_.setSingleShot(true); timeout_.setInterval(180000);
     connect(&timeout_,&QTimer::timeout,this,[this]{finishError("Portal request timed out; re-enable to retry.");});
     auto* watcher=new QDBusServiceWatcher(service_,bus_,QDBusServiceWatcher::WatchForOwnerChange,this);
     connect(watcher,&QDBusServiceWatcher::serviceOwnerChanged,this,
         [this](const QString&,const QString& oldOwner,const QString& newOwner) { if(!oldOwner.isEmpty() && oldOwner!=newOwner) disconnected(); });
-    const bool subscribed=bus_.connect(service_,DesktopPath,ShortcutInterface,"Activated",this,SLOT(activated(QDBusObjectPath,QString,qulonglong,QVariantMap)));
-    if(!subscribed) qWarning("Portal activation subscription failed");
+    activationSubscribed_=bus_.connect(service_,DesktopPath,ShortcutInterface,"Activated",this,SLOT(activated(QDBusObjectPath,QString,qulonglong,QVariantMap)));
+
     bus_.connect({}, "/org/freedesktop/DBus/Local", "org.freedesktop.DBus.Local","Disconnected",this,SLOT(disconnected()));
 }
 QtPortalTransport::~QtPortalTransport() { close(); }
 void QtPortalTransport::probe() {
+    if(!activationSubscribed_) { emit probed(0,"Portal activation subscription unavailable; use tray or --trigger."); return; }
     const auto generation=++generation_;
     auto call=QDBusMessage::createMethodCall(service_,DesktopPath,"org.freedesktop.DBus.Properties","Get");
     call<<ShortcutInterface<<QString("version");
