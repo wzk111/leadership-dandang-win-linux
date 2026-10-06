@@ -19,6 +19,7 @@ private slots:
         s.start(false); emit t->probed(1,{});
         QVERIFY(s.status().available); QCOMPARE(s.status().portalVersion,1u);
         QVERIFY(!s.status().registered); QCOMPARE(t->creates,0);
+        emit t->lost(); QVERIFY(!s.status().available);
     }
     void lifecycleAndSessionFilter() {
         auto transport=std::make_unique<FakePortal>(); auto* t=transport.get(); PortalGlobalShortcut s(std::move(transport));
