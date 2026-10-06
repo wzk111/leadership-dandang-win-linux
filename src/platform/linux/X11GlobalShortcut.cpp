@@ -32,7 +32,7 @@ public:
         shutdown(); wait();
         for(int fd:wake_) if(fd>=0) ::close(fd);
     }
-    void shutdown() { requestInterruption(); if(wake_[1]>=0) {const char c=1; (void)::write(wake_[1],&c,1);} }
+    void shutdown() { requestInterruption(); if(wake_[1]>=0) {const char c=1; const auto written=::write(wake_[1],&c,1); Q_UNUSED(written);} }
 signals:
     void state(bool available,bool registered,const QString& description);
     void pressed();

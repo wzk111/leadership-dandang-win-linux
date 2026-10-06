@@ -4,3 +4,4 @@ openbox >/dev/null 2>&1 &
 wm_pid=$!
 trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
 ./build/test_overlay_runtime
+./build/test_x11_shortcut

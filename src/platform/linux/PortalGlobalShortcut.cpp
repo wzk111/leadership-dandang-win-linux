@@ -30,7 +30,7 @@ PortalGlobalShortcut::PortalGlobalShortcut(std::unique_ptr<PortalTransport> t):t
         status_.lastActivation=QDateTime::currentDateTimeUtc(); emit statusChanged(); emit activated();
     });
     connect(transport_.get(),&PortalTransport::lost,this,[this] {
-        if(phase_==Phase::Idle && !status_.registered) return;
+        if(phase_==Phase::Idle && !status_.registered && !status_.available) return;
         status_.available=false; fail("Portal session lost; re-enable or use tray / --trigger.");
     });
 }

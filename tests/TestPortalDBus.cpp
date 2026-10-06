@@ -41,13 +41,15 @@ public:
 class TestPortalDBus : public QObject {
     Q_OBJECT
 private slots:
+    void observe(const QDBusMessage& message) { qWarning() << "Observed activation signature" << message.signature(); }
     void realAsyncProtocolWithFakeService() {
         qDBusRegisterMetaType<PortalBinding>(); qDBusRegisterMetaType<PortalBindings>();
         auto bus=QDBusConnection::sessionBus(); QVERIFY(bus.isConnected());
         const QString name="org.worksidekick.TestPortal";
         FakeService service; QVERIFY(bus.registerService(name));
         QVERIFY(bus.registerVirtualObject("/org/freedesktop/portal/desktop",&service,QDBusConnection::SubPath));
-                auto transport=std::make_unique<QtPortalTransport>(name);
+        QVERIFY(bus.connect(name,"/org/freedesktop/portal/desktop","org.freedesktop.portal.GlobalShortcuts","Activated",this,SLOT(observe(QDBusMessage))));
+        auto transport=std::make_unique<QtPortalTransport>(name);
         QVERIFY(transport->metaObject()->indexOfSlot("activated(QDBusObjectPath,QString,qulonglong,QVariantMap)")>=0);
         QSignalSpy rawActivation(transport.get(),&PortalTransport::activation);
         PortalGlobalShortcut shortcut(std::move(transport)); QSignalSpy activated(&shortcut,&IGlobalShortcut::activated);

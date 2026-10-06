@@ -19,7 +19,8 @@ QtPortalTransport::QtPortalTransport(QString service):service_(std::move(service
     auto* watcher=new QDBusServiceWatcher(service_,bus_,QDBusServiceWatcher::WatchForOwnerChange,this);
     connect(watcher,&QDBusServiceWatcher::serviceOwnerChanged,this,
         [this](const QString&,const QString& oldOwner,const QString& newOwner) { if(!oldOwner.isEmpty() && oldOwner!=newOwner) disconnected(); });
-    bus_.connect(service_,DesktopPath,ShortcutInterface,"Activated",this,SLOT(activated(QDBusObjectPath,QString,qulonglong,QVariantMap)));
+    const bool subscribed=bus_.connect(service_,DesktopPath,ShortcutInterface,"Activated",this,SLOT(activated(QDBusObjectPath,QString,qulonglong,QVariantMap)));
+    if(!subscribed) qWarning("Portal activation subscription failed");
     bus_.connect({}, "/org/freedesktop/DBus/Local", "org.freedesktop.DBus.Local","Disconnected",this,SLOT(disconnected()));
 }
 QtPortalTransport::~QtPortalTransport() { close(); }
