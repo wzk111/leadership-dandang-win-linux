@@ -5,7 +5,7 @@ namespace ws {
 enum class AIError { None, MissingKey, MissingModel, Authentication, RateLimited, Network,
                      Timeout, Cancelled, InvalidJson, EmptyResponse, Server, Refused, Incomplete, TooLarge };
 struct AIResult { QString text; AIError error = AIError::None; QString message; };
-struct AIRequest { Prompt prompt; QString model; QString apiKey; };
+struct AIRequest { Prompt prompt; QString model; QString apiKey; int maxOutputTokens=2048; QString providerId="openai"; QString baseUrl; };
 class IAIProvider : public QObject {
     Q_OBJECT
 public:

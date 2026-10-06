@@ -7,6 +7,7 @@ class ISecretStore : public QObject {
     Q_OBJECT
 public:
     using QObject::QObject;
+    virtual bool selectProvider(const QString&) { return !busy(); }
     virtual bool read() = 0;
     virtual bool save(const QString& key) = 0;
     virtual bool remove() = 0;

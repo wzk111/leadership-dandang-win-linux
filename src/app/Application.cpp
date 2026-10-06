@@ -12,24 +12,32 @@
 #include <QSysInfo>
 namespace ws {
 Application::Application(AppController& controller, ISecretStore& secrets, QSettings& settings, ISelectionMonitor* monitor, IPlatformWindowPolicy* policy, IExplicitSelectionResolver* resolver, IGlobalShortcut* shortcut)
-    : resolver_(resolver), shortcut_(shortcut), windowPolicy_(policy), monitor_(monitor), controller_(controller), secrets_(secrets), settingsStore_(settings), settings_(settings, secrets) {
+    : resolver_(resolver), shortcut_(shortcut), windowPolicy_(policy), monitor_(monitor), controller_(controller), secrets_(secrets), settingsStore_(settings), settings_(settings, secrets), profile_(settings) {
     auto showWorkspace = [this] { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); };
     connect(&workspace_, &WorkspaceWindow::processClipboard, &controller_, &AppController::captureClipboard);
     connect(&workspace_, &WorkspaceWindow::featureChosen, &controller_, &AppController::run);
     connect(&workspace_, &WorkspaceWindow::settingsRequested, this, &Application::openSettings);
     connect(&workspace_, &WorkspaceWindow::diagnosticsRequested, this, &Application::openDiagnostics);
     connect(&controller_, &AppController::captured, &workspace_, &WorkspaceWindow::setCaptured);
-    connect(&controller_, &AppController::loading, this, [this] { workspace_.setBusy(true); result_.loading(); });
+    connect(&controller_, &AppController::loading, this, [this] { workspace_.setBusy(true); result_.loading(controller_.generationContext() && !controller_.generationContext()->lastResult.isEmpty()); });
     connect(&controller_, &AppController::finished, this, [this](const AIResult& result) {
         workspace_.setBusy(false);
         if (result.error == AIError::None) result_.success(result.text);
-        else result_.error(result.message);
+        else result_.error(result.message,controller_.generationContext() && !controller_.generationContext()->lastResult.isEmpty());
+        result_.setRefinementEnabled(controller_.generationContext() && !controller_.generationContext()->lastResult.isEmpty());
+        const auto& metric=controller_.metrics();result_.setMetadata(metric.provider+" · "+metric.model);
     });
     connect(&result_, &ResultCard::cancelRequested, &controller_, &AppController::cancel);
+    connect(&result_,&ResultCard::closed,&controller_,&AppController::clearGeneration);
+    connect(&result_,&ResultCard::refinementRequested,&controller_,&AppController::refine);
+    connect(&controller_,&AppController::replyRequested,&reply_,&ReplyComposer::openSelection);
+    connect(&reply_,&ReplyComposer::generateRequested,&controller_,&AppController::generateReply);
+    connect(&controller_,&AppController::loading,&reply_,&QWidget::hide);
     connect(qApp, &QApplication::aboutToQuit, &controller_, &AppController::cancel);
     menu_.addAction("Open WorkSidekick", this, showWorkspace);
     menu_.addAction("Process Clipboard", this, [this, showWorkspace] { controller_.captureClipboard(); showWorkspace(); });
     menu_.addSeparator();
+    menu_.addAction("Profile",this,[this]{profile_.reload();profile_.show();profile_.raise();});
     menu_.addAction("Settings", this, &Application::openSettings);
     menu_.addAction("Diagnostics", this, &Application::openDiagnostics);
     menu_.addAction("About", this, [this] {

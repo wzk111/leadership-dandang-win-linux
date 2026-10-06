@@ -8,6 +8,8 @@
 #include "ui/WorkspaceWindow.h"
 #include "ui/SettingsWindow.h"
 #include "ui/ResultCard.h"
+#include "ui/ProfileWindow.h"
+#include "ui/ReplyComposer.h"
 #include "ui/SelectionDiagnostics.h"
 #include "ui/ActionBar.h"
 #include "ui/ManualActionPalette.h"
@@ -59,6 +61,8 @@ private:
     WorkspaceWindow workspace_;
     SettingsWindow settings_;
     ResultCard result_;
+    ProfileWindow profile_;
+    ReplyComposer reply_;
     QWidget diagnostics_;
     QPlainTextEdit* diagnosticsText_;
     QLabel* testStatus_;
