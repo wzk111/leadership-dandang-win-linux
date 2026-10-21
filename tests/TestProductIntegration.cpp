@@ -5,6 +5,7 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QPlainTextEdit>
+#include <QLineEdit>
 #include "app/Application.h"
 using namespace ws;
 class IntegrationAI:public IAIProvider {
@@ -29,6 +30,69 @@ template<class T>T* window(){for(auto* w:QApplication::topLevelWidgets())if(auto
 class TestProductIntegration:public QObject {
  Q_OBJECT
 private slots:
+ void providerSwitchKeepsModelsButDiscardsUnsavedKeys(){
+    QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);
+    QVERIFY((Settings{"initial-openai","English"}.save(s)));
+    IntegrationAI ai;IntegrationSecret secret;IntegrationSelection selection;
+    AppController c(ai,secret,selection,s);Application app(c,secret,s);
+    app.openSettings();QApplication::setQuitOnLastWindowClosed(false);
+    auto* sw=window<SettingsWindow>();QVERIFY(sw);
+    auto* provider=sw->findChild<QComboBox*>("provider");
+    auto* model=sw->findChild<QLineEdit*>("model");
+    auto* key=sw->findChild<QLineEdit*>("apiKey");
+    auto* save=sw->findChild<QPushButton*>("saveSettings");
+    QVERIFY(provider);QVERIFY(model);QVERIFY(key);QVERIFY(save);
+    const QStringList ids{"openai","anthropic","gemini","openai_compatible"};
+    for(const auto& id:ids) {
+        const int index=provider->findData(id);QVERIFY(index>=0);provider->setCurrentIndex(index);
+        QVERIFY(key->text().isEmpty());
+        model->setText("chosen-"+id);key->setText("UNSAVED_PRIVATE_KEY_"+id);
+        save->click();
+    }
+    // Switching away and back restores each configuration, never another provider's draft key.
+    for(const auto& id:ids) {
+        provider->setCurrentIndex(provider->findData(id));
+        QCOMPARE(model->text(),"chosen-"+id);QVERIFY(key->text().isEmpty());
+        QCOMPARE(Settings::forProvider(s,id).model,"chosen-"+id);
+        key->setText("UNSAVED_PRIVATE_KEY_"+id);
+    }
+    sw->close();QVERIFY(key->text().isEmpty());
+    QCoreApplication::processEvents();
+    QCOMPARE(secret.reads,0);QCOMPARE(ai.calls,0);
+    QSettings persisted(d.filePath("s.ini"),QSettings::IniFormat);
+    for(const auto& name:persisted.allKeys())QVERIFY(!persisted.value(name).toString().contains("UNSAVED_PRIVATE_KEY"));
+ }
+ void disablingAllFeaturesRemovesEveryEntryPoint(){
+    QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);
+    QVERIFY((Settings{"model","English"}.save(s)));
+    IntegrationAI ai;IntegrationSecret secret;IntegrationSelection selection;
+    AppController c(ai,secret,selection,s);Application app(c,secret,s);
+    app.start();QApplication::setQuitOnLastWindowClosed(false);
+    auto* sw=window<SettingsWindow>();auto* workspace=window<WorkspaceWindow>();
+    auto* bar=window<ActionBar>();auto* manual=window<ManualActionPalette>();
+    QVERIFY(sw);QVERIFY(workspace);QVERIFY(bar);QVERIFY(manual);
+    workspace->findChild<QPushButton*>("processClipboard")->click();
+    const Selection source{"local source",{},"fixture"};
+    bar->showForSelection(source,{10,10});manual->showSelection({source,SelectionSource::AtSpi});
+    for(const auto& feature:FeatureRegistry::all()) {
+        auto* enabled=sw->findChild<QCheckBox*>("enabled_"+feature.stableId);QVERIFY(enabled);
+        enabled->setChecked(false);
+    }
+    sw->findChild<QPushButton*>("saveSettings")->click();
+    bar->showForSelection(source,{10,10});
+    QVERIFY(!bar->isVisible());QVERIFY(!bar->currentSelection());
+    // Loaded source remains local, but none of the three surfaces offers an AI action.
+    for(const auto& feature:FeatureRegistry::all()) {
+        const auto index=QString::number(int(feature.id));
+        auto* workspaceAction=workspace->findChild<QPushButton*>("feature"+index);
+        auto* manualAction=manual->findChild<QPushButton*>("manualAction"+index);
+        auto* quickAction=bar->findChild<QPushButton*>("action"+index);
+        QVERIFY(workspaceAction);QVERIFY(manualAction);QVERIFY(quickAction);
+        QVERIFY(workspaceAction->isHidden());QVERIFY(!workspaceAction->isEnabled());
+        QVERIFY(manualAction->isHidden());QVERIFY(!manualAction->isEnabled());QVERIFY(quickAction->isHidden());
+    }
+    QCoreApplication::processEvents();QCOMPARE(secret.reads,0);QCOMPARE(ai.calls,0);
+ }
  void closeRestoresWorkspace_data(){QTest::addColumn<bool>("duringAI");QTest::newRow("secret")<<false;QTest::newRow("AI")<<true;}
  void closeRestoresWorkspace(){
     QFETCH(bool,duringAI);QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);Settings{"model","English"}.save(s);
