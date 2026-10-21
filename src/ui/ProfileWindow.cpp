@@ -30,7 +30,13 @@ ProfileWindow::ProfileWindow(QSettings& s):settings_(s) {
         settings_.setValue("profile/enabled",enabled_->isChecked());settings_.sync();
         status_->setText(settings_.status()==QSettings::NoError?"Profile saved locally.":"Could not save profile preference.");emit profileChanged();
     });
-    connect(clear,&QPushButton::clicked,this,[this]{Profile::clear(settings_);reload();status_->setText("Profile cleared locally.");emit profileChanged();});
+    connect(clear,&QPushButton::clicked,this,[this] {
+        Profile::clear(settings_);reload();
+        status_->setText(settings_.status()==QSettings::NoError
+            ? "Profile cleared locally."
+            : "Could not clear the saved profile from disk. It is disabled for this session, but may return after restarting. Check local file permissions and retry.");
+        emit profileChanged();
+    });
     reload();
 }
 void ProfileWindow::reload() {
@@ -40,3 +46,4 @@ void ProfileWindow::reload() {
     enabled_->setChecked(settings_.value("profile/enabled",false).toBool());
 }
 }
+
