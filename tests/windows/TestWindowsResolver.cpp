@@ -36,10 +36,10 @@ private slots:
     auto query=std::make_unique<Query>();auto* worker=query.get();Resolver resolver(nullptr,*QApplication::clipboard(),std::move(query));
     QApplication::clipboard()->setText("must not fall back after focus change");QObject context;int calls=0;std::optional<ResolvedSelection> result;
     resolver.resolveAsync(&context,[&](auto value){++calls;result=value;});resolver.foreground=22;worker->finish(Selection{"old",{},"fixture"});
-    QCOMPARE(calls,1);QVERIFY(!result);
-    resolver.resolveAsync(&context,[&](auto){++calls;});resolver.cancel();worker->finish(Selection{"late",{},"fixture"});QCOMPARE(calls,1);
-    auto* gone=new QObject;resolver.resolveAsync(gone,[&](auto){++calls;});delete gone;worker->finish(Selection{"late",{},"fixture"});QCOMPARE(calls,1);
-    resolver.resolveAsync(&context,[&](auto value){++calls;result=value;});worker->finish(Selection{"new",{},"fixture"});QCOMPARE(calls,2);QCOMPARE(result->selection.text,QString("new"));
+    QCOMPARE(calls,0);QVERIFY(!result); // No callback means no palette or focus theft.
+    resolver.resolveAsync(&context,[&](auto){++calls;});resolver.cancel();worker->finish(Selection{"late",{},"fixture"});QCOMPARE(calls,0);
+    auto* gone=new QObject;resolver.resolveAsync(gone,[&](auto){++calls;});delete gone;worker->finish(Selection{"late",{},"fixture"});QCOMPARE(calls,0);
+    resolver.resolveAsync(&context,[&](auto value){++calls;result=value;});worker->finish(Selection{"new",{},"fixture"});QCOMPARE(calls,1);QCOMPARE(result->selection.text,QString("new"));
  }
 };
 QTEST_MAIN(TestWindowsResolver)

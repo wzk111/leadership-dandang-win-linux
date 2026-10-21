@@ -1,5 +1,16 @@
 # Architecture
 
+## M5 platform integration (0.6.0)
+
+The shared product described below is unchanged in scope. Windows adds isolated
+UIA worker/process orchestration, gesture monitor, nonactivating window policy,
+RegisterHotKey, Credential Manager and secured single-instance adapters. The
+explicit selection resolver now supports asynchronous completion; Application
+discards canceled/late generations before opening a palette. Linux's synchronous
+resolver remains supported through the default asynchronous adapter.
+See [Windows architecture](windows-architecture.md) for ownership, COM isolation,
+DPI conversion, IPC and validation boundaries.
+
 ## Current M4 product layer (0.5.0)
 
 The sections below preserve the M0–M3 backend design history. M4 extends the

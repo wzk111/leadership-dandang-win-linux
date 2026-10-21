@@ -9,8 +9,6 @@
 #include <QTimer>
 #include <limits>
 #include <cstdio>
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
 #include <richedit.h>
 #include "platform/windows/UIASelectionProvider.h"

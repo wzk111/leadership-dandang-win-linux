@@ -4,6 +4,8 @@
 #include <QTimer>
 #include <windows.h>
 namespace ws {
+WindowsSelectionResolver::WindowsSelectionResolver(ISelectionMonitor* monitor,QClipboard& clipboard,QObject* parent)
+    :WindowsSelectionResolver(monitor,clipboard,std::make_unique<UIAQuery>(),parent){}
 WindowsSelectionResolver::WindowsSelectionResolver(ISelectionMonitor* monitor,QClipboard& clipboard,std::unique_ptr<UIAQuery> query,QObject* parent)
     :QObject(parent),monitor_(monitor),clipboard_(clipboard),query_(query?std::move(query):std::make_unique<UIAQuery>()){}
 WindowsSelectionResolver::~WindowsSelectionResolver(){cancel();}
@@ -27,8 +29,10 @@ void WindowsSelectionResolver::resolveAsync(QObject* context,Completion complete
     auto finish=[this,guard,generation,target,completed=std::move(completed)](const UIAQueryResult& value) {
         if(!guard || generation!=generation_)return;
         disconnect(completion_);completion_={};disconnect(destroyed_);destroyed_={};
-        const auto selected=foregroundWindow()==target?choose(value.initialized?value.selection:std::optional<Selection>{}):std::optional<ResolvedSelection>{};
-        completed(selected);
+        // Focus moved after the user's trigger: cancel silently. Reporting an empty
+        // selection would open the application's error palette over their new task.
+        if(foregroundWindow()!=target)return;
+        completed(choose(value.initialized?value.selection:std::optional<Selection>{}));
     };
     completion_=connect(query_.get(),&UIAQuery::completed,this,finish);
     if(!query_->request(target)) {

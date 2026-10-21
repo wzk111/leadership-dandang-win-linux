@@ -1,5 +1,31 @@
 # Troubleshooting
 
+## Windows M5
+
+- Missing Qt DLL/platform plugin: run the matching Qt 6.8.3 MSVC x64 windeployqt
+  for both app and UIA helper, and keep platforms/qwindows.dll in the bundle.
+- UIA unavailable: keep worksidekick_uia_worker.exe adjacent to worksidekick.exe.
+  Diagnostics show initialization and selected-character/anchor metadata. Some
+  controls expose no TextPattern; copy manually and use the explicit fallback.
+- No automatic toolbar: enable it in Settings, use a drag/double-click in an
+  accessible external app, and check anchor and monitor state. Keyboard selection
+  uses Ctrl+Alt+P. Missing geometry suppresses the toolbar but not manual actions.
+- Ctrl+Alt+P unavailable: another app may own the combination. Disable/re-enable
+  after freeing it, or use tray/--trigger. WorkSidekick never replaces that binding.
+- Credential Manager unavailable: verify the current Windows user's session and
+  policy. Keys require explicit entry per provider; no plaintext fallback exists.
+- An elevated app, protected control, remote session or custom Electron editor
+  may block accessibility. Do not elevate WorkSidekick to bypass the boundary;
+  use an explicit copy. Word/Outlook/Teams compatibility is not assumed.
+- A duplicate instance failure can indicate an inaccessible user-local runtime
+  directory or session/ACL mismatch. Do not weaken the directory/pipe permissions.
+- Native interactive tests: set WORKSIDEKICK_WINDOWS_INTERACTIVE=1 and run
+  test_windowspolicy.exe from the validation bundle. It opens only an external
+  synthetic fixture, measures foreground/selection across show/hide/click, and
+  closes it. A desktop-permission skip is NOT TESTED, not evidence of focus safety.
+- Mathematical DPI tests do not validate physical mixed-DPI monitors. See the
+  Windows compatibility matrix before relying on an unmeasured display setup.
+
 ## M4 product and provider checks
 
 - Missing action: open Settings → Features, enable it and Save settings. The toolbar

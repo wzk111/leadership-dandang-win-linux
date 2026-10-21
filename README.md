@@ -1,15 +1,45 @@
 # WorkSidekick
 
-A C++20 / Qt 6 desktop assistant for explicitly chosen text. M4 (0.5.0) adds
+A C++20 / Qt 6 desktop assistant for explicitly chosen text. M5 (0.6.0) brings the Windows native backend to the existing
 **Plain Speak, Summarize, Polish, Reply, Relevance and Add Insight**, an optional
 local Profile, result refinements, and four provider choices. Review results and
 copy them yourself. Selecting text never sends an AI request.
 
-**Target:** Ubuntu 22.04 LTS. Native Windows integration is planned for M5.
+**Targets:** Ubuntu 22.04 LTS and Windows x64 (MSVC / Qt 6).
 This is an independent implementation inspired by
 [leadership-dandang](https://github.com/SecondServ/leadership-dandang); its source
 code was not copied. The original requirements are preserved in
 [PROJECT_SPEC.md](PROJECT_SPEC.md).
+
+## Build on Windows x64 (M5)
+
+Install Visual Studio 2022 C++ desktop tools, CMake, Ninja, and Qt 6.8.3
+`msvc2022_64`. Use an x64 Native Tools terminal with Qt's `bin` on PATH and its
+installation in CMAKE_PREFIX_PATH. No administrator runtime is required.
+
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 2
+ctest --test-dir build --output-on-failure
+.\build\worksidekick.exe
+```
+
+Keep `worksidekick_uia_worker.exe` beside the app. To run away from the build
+machine, deploy Qt with `windeployqt --release build\worksidekick.exe` and
+`windeployqt --release build\worksidekick_uia_worker.exe`. This is a developer
+bundle, not the M6 installer. CI also publishes native validation binaries.
+
+UIA selected text supplies the existing toolbar after a drag/double-click when
+Automatic selection toolbar is enabled (default OFF). Enable Ctrl+Alt+P to query
+keyboard selections: fresh UIA, then Clipboard only for this explicit trigger.
+Tray actions, `worksidekick.exe --trigger`, and Process Clipboard remain available.
+No clipboard listener, simulated copy, automatic AI request or automatic paste is
+added. Credential Manager keeps one key per provider under your Windows account;
+Linux keys are not migrated. Configure Windows keys explicitly in Settings.
+
+See [M5 completion](docs/m5-completion.md), [Windows compatibility](docs/m5-windows-compatibility.md),
+[Windows architecture](docs/windows-architecture.md) and [troubleshooting](docs/troubleshooting.md).
+Real application and mixed-DPI acceptance are distinct from unit/native fixtures.
 
 ## Build on Ubuntu 22.04
 

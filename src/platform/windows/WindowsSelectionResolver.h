@@ -9,7 +9,8 @@ class UIAQuery;
 class WindowsSelectionResolver:public QObject,public IExplicitSelectionResolver {
  Q_OBJECT
 public:
-    WindowsSelectionResolver(ISelectionMonitor*,QClipboard&,std::unique_ptr<UIAQuery> query={},QObject* parent=nullptr);
+    WindowsSelectionResolver(ISelectionMonitor*,QClipboard&,QObject* parent=nullptr);
+    WindowsSelectionResolver(ISelectionMonitor*,QClipboard&,std::unique_ptr<UIAQuery> query,QObject* parent=nullptr);
     ~WindowsSelectionResolver()override;
     std::optional<ResolvedSelection> resolve()override;
     void resolveAsync(QObject*,Completion)override;

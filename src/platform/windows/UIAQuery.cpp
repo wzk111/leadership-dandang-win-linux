@@ -7,8 +7,6 @@
 #include <QJsonArray>
 #include <QElapsedTimer>
 #include <algorithm>
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
 namespace ws {
 namespace {constexpr qsizetype outputLimit=2*1024*1024;}

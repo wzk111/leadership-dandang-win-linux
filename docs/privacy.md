@@ -1,4 +1,23 @@
-# Privacy — M4
+# Privacy — M5
+
+## Windows native boundaries
+
+Windows observes only left-button gesture metadata through WH_MOUSE_LL and
+foreground-window changes to request selected TextPattern ranges. It installs no
+keyboard hook and reads no arbitrary control/document text. Password controls and
+the app's own process are excluded. Keyboard selections use an explicit shortcut.
+The windowless UIA helper returns bounded selection JSON through its private
+parent pipe; it is canceled on timeout or stale context. This is local processing,
+not upload, logging or persistent history. The toolbar and diagnostics never
+automatically request AI.
+
+Windows keys use Credential Manager generic targets WorkSidekick/openai,
+WorkSidekick/anthropic, WorkSidekick/gemini and WorkSidekick/openai_compatible.
+LOCAL_MACHINE persistence here means this user's credentials survive logoff;
+it does not grant other users access. No key is stored in QSettings or migrated
+from Linux. Windows QSettings may use the user registry; Profile remains plain
+text. Single-instance named pipes carry only bounded open/trigger commands and
+use current-user ACLs plus session identity checks, never selected text or keys.
 
 Selecting text, showing the toolbar, opening Reply, editing Profile, switching
 providers, saving preferences, triggering a shortcut and displaying diagnostics
