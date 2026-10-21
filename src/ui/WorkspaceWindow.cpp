@@ -12,7 +12,7 @@ WorkspaceWindow::WorkspaceWindow(QWidget* parent) : QWidget(parent) {
     auto* layout = new QVBoxLayout(this);
     auto* title = new QLabel("WorkSidekick", this);
     QFont font = title->font(); font.setPointSize(20); font.setBold(true); title->setFont(font);
-    auto* help = new QLabel("Copy text in another app, load it here, then choose an action.\nOnly the text shown below is sent when you choose an action.", this);
+    auto* help = new QLabel("Copy text in another app, load it here, then choose an action.\nPersonalized actions include your saved Profile when enabled. Reply opens a preview before you generate.", this);
     help->setWordWrap(true);
     trayNotice_ = new QLabel(this); trayNotice_->setWordWrap(true);
     process_ = new QPushButton("Process Clipboard", this); process_->setObjectName("processClipboard");

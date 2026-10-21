@@ -88,6 +88,34 @@ private slots:
     auto p=make(id,s);QSignalSpy spy(p.get(),&IAIProvider::completed);QVERIFY(p->generate(request(id,s)));QTRY_COMPARE(spy.size(),1);QCOMPARE(qvariant_cast<AIResult>(spy[0][0]).error,AIError::EmptyResponse);}
     {Server s;s.body=QByteArray(4*1024*1024+1,'x');auto p=make(id,s);QSignalSpy spy(p.get(),&IAIProvider::completed);QVERIFY(p->generate(request(id,s)));QTRY_COMPARE(spy.size(),1);QCOMPARE(qvariant_cast<AIResult>(spy[0][0]).error,AIError::TooLarge);}
  }
+ void geminiBlockedErrors_data(){
+    QTest::addColumn<QString>("code");QTest::addColumn<bool>("refused");
+    for(const auto* code:{"safety","jailbreak","recitation","language","prohibited_content","spii","blocklist",
+        "image_safety","image_prohibited_content","image_recitation","image_other","content_blocked"})QTest::newRow(code)<<QString(code)<<true;
+    QTest::newRow("unknown error")<<QString("unknown_error")<<false;
+ }
+ void geminiBlockedErrors(){
+    QFETCH(QString,code);QFETCH(bool,refused);Server s;s.status=400;
+    s.body=QJsonDocument(QJsonObject{{"error",QJsonObject{{"code",code},{"message","PRIVATE SOURCE AND KEY"}}}}).toJson(QJsonDocument::Compact);
+    auto p=make("gemini",s);QSignalSpy spy(p.get(),&IAIProvider::completed);
+    QVERIFY(p->generate(request("gemini",s)));QTRY_COMPARE(spy.size(),1);
+    const auto result=qvariant_cast<AIResult>(spy[0][0]);
+    QCOMPARE(result.error,refused?AIError::Refused:AIError::Server);QVERIFY(result.text.isEmpty());QVERIFY(!result.message.contains("PRIVATE"));
+ }
+ void anthropicStopReasons_data(){
+    QTest::addColumn<QString>("reason");QTest::addColumn<bool>("refused");
+    QTest::newRow("refusal")<<QString("refusal")<<true;
+    QTest::newRow("max_tokens")<<QString("max_tokens")<<false;
+ }
+ void anthropicStopReasons(){
+    QFETCH(QString,reason);QFETCH(bool,refused);Server s;
+    s.body=QJsonDocument(QJsonObject{{"type","message"},{"role","assistant"},{"stop_reason",reason},
+        {"content",QJsonArray{QJsonObject{{"type","text"},{"text","PRIVATE PARTIAL RESPONSE"}}}}}).toJson(QJsonDocument::Compact);
+    auto p=make("anthropic",s);QSignalSpy spy(p.get(),&IAIProvider::completed);
+    QVERIFY(p->generate(request("anthropic",s)));QTRY_COMPARE(spy.size(),1);
+    const auto result=qvariant_cast<AIResult>(spy[0][0]);
+    QCOMPARE(result.error,refused?AIError::Refused:AIError::Incomplete);QVERIFY(result.text.isEmpty());QVERIFY(!result.message.contains("PRIVATE"));
+ }
  void cancelAndTimeout_data(){contracts_data();}
  void cancelAndTimeout(){
     QFETCH(QString,id);Server s;s.hang=true;auto p=make(id,s,50);QSignalSpy spy(p.get(),&IAIProvider::completed);
