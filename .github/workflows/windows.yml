@@ -1,0 +1,24 @@
+name: Windows M5
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build-test:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Configure Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build Release
+        run: cmake --build build --parallel 2
+      - name: Shared product tests
+        run: ctest --test-dir build --output-on-failure
