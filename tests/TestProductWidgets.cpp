@@ -4,6 +4,7 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QCheckBox>
+#include <QLabel>
 #include "ui/ProfileWindow.h"
 #include "ui/ReplyComposer.h"
 #include "ui/ResultCard.h"
@@ -33,6 +34,21 @@ private slots:
     auto* clear=window.findChild<QPushButton*>("clearProfile");QVERIFY(clear);clear->click();
     QVERIFY(Profile::load(s).role.isEmpty());QVERIFY(!s.value("profile/enabled").toBool());
  }
+ void profileClearReportsPersistenceFailure() {
+    QTemporaryDir directory;QVERIFY(directory.isValid());
+    // An existing directory cannot be replaced by an INI file, even when running as root.
+    QSettings settings(directory.path(),QSettings::IniFormat);
+    ProfileWindow window(settings);
+    auto* clear=window.findChild<QPushButton*>("clearProfile");QVERIFY(clear);clear->click();
+    QVERIFY(settings.status()!=QSettings::NoError);
+    bool reportsFailure=false;
+    for(auto* label:window.findChildren<QLabel*>()) {
+        const auto text=label->text();
+        QVERIFY(!text.contains("Profile cleared locally",Qt::CaseInsensitive));
+        reportsFailure|=text.contains("failed",Qt::CaseInsensitive) || text.contains("could not",Qt::CaseInsensitive);
+    }
+    QVERIFY2(reportsFailure,"Clear Profile must report its persistence failure instead of claiming success.");
+ }
  void refinementPreservesResult() {
     ResultCard card;card.success("previous result");
     auto* regenerate=card.findChild<QPushButton*>("regenerate");QVERIFY(regenerate);QVERIFY(regenerate->isEnabled());
@@ -47,3 +63,4 @@ private slots:
 };
 QTEST_MAIN(TestProductWidgets)
 #include "TestProductWidgets.moc"
+
