@@ -39,7 +39,7 @@ SelectionDiagnostics::SelectionDiagnostics(ISelectionMonitor* monitor, QWidget* 
 void SelectionDiagnostics::refresh() {
     if(!monitor_) { metadata_->setPlainText("Native selection monitor not attached (test/shared build)."); return; }
     const auto s=monitor_->status(); const auto last=monitor_->latestSelection();
-    QString text=QString("Backend: %1\nBackend available: %2; initialized: %3; listener running: %4\n%5\nEvents received: %6\nLast event (UTC): %7\nLast result: %8\nAI triggered automatically: NO\nSelection mode for AI: MANUAL CLIPBOARD")
+    QString text=QString("Backend: %1\nBackend available: %2; initialized: %3; listener running: %4\n%5\nEvents received: %6\nLast event (UTC): %7\nLast result: %8\nAI triggered automatically: NO\nSelection mode for AI: explicit feature action / clipboard")
         .arg(monitor_->backendName(),s.available?"yes":"no",s.initialized?"yes":"no",s.running?"yes":"no",
              s.description,QString::number(s.events),s.lastEvent.isValid()?s.lastEvent.toString(Qt::ISODate):"none",s.lastResult);
     if(last) {

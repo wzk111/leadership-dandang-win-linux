@@ -99,7 +99,9 @@ bool InstanceCoordinator::forward(bool trigger,bool& connected) {
     if(socket.bytesToWrite()>0 && !socket.waitForBytesWritten(1500)){error_="Existing instance did not accept command.";return false;}
     QByteArray ack;QElapsedTimer timeout;timeout.start();
     while(!ack.contains('\n') && ack.size()<=16 && timeout.elapsed()<1500) {
-        if(!socket.bytesAvailable() && !socket.waitForReadyRead(int(1500-timeout.elapsed())))break;
+        const auto remaining=1500-timeout.elapsed();
+        if(remaining<=0)break;
+        if(!socket.bytesAvailable() && !socket.waitForReadyRead(int(remaining)))break;
         ack+=socket.read(17-ack.size());
     }
     if(ack!="ok\n"){error_="Existing instance did not acknowledge; retry when responsive.";return false;}

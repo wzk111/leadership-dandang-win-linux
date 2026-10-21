@@ -41,7 +41,11 @@ bool UIAQuery::request(quintptr window){
         if(current(process,sequence) && error==QProcess::FailedToStart)finish(process,sequence,{{},false,"UIA worker unavailable"});
     });
     connect(process,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this,process,sequence](int code,QProcess::ExitStatus status){
-        if(!current(process,sequence))return;readOutput(process,sequence);if(!current(process,sequence))return;
+        if(!current(process,sequence))return;
+        QPointer<UIAQuery> guard(this);
+        readOutput(process,sequence);
+        // Output overflow emits completed; a consumer may destroy this query there.
+        if(!guard || !current(process,sequence))return;
         const auto result=code==0 && status==QProcess::NormalExit?decode():UIAQueryResult{{},false,"UIA worker failed"};
         finish(process,sequence,result);
     });

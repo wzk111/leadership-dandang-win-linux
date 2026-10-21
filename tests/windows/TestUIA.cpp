@@ -90,6 +90,16 @@ private slots:
     int reentered=0;connect(&query,&UIAQuery::completed,&query,[&]{if(++reentered==1)QVERIFY(query.request(2));});
     QVERIFY(query.request(2));QTRY_COMPARE(reentered,2);QCOMPARE(spy.size(),3);
  }
+ void oversizedCompletionCanDestroyQuery(){
+    QPointer<UIAQuery> query=new UIAQuery(nullptr,QCoreApplication::applicationFilePath(),2000);
+    int completions=0;
+    connect(query.data(),&UIAQuery::completed,this,[&](const UIAQueryResult& result){
+        ++completions;QVERIFY(!result.selection);delete query.data();
+    });
+    QVERIFY(query->request(4));
+    QTRY_VERIFY(query.isNull());QCOMPARE(completions,1);
+    QCoreApplication::processEvents();QCOMPARE(completions,1);
+ }
  void boundedShutdown(){
     QElapsedTimer timer;timer.start();{UIAQuery query(nullptr,QCoreApplication::applicationFilePath(),30000);QVERIFY(query.request(1));QTest::qWait(50);}
     QVERIFY(timer.elapsed()<2000);
