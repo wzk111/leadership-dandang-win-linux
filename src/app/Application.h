@@ -45,6 +45,7 @@ private:
     QString lastManualSource_ = "none";
     qsizetype lastManualCharacters_ = 0;
     QDateTime lastManualTrigger_;
+    quint64 manualGeneration_ = 0;
     void setupOverlay();
     void setAutomaticPopup(bool enabled);
     void showSelectionToolbar(const Selection& selection);

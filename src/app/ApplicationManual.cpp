@@ -3,6 +3,7 @@
 #include <QPlainTextEdit>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
+#include <QPointer>
 namespace ws {
 void Application::setupManual() {
     auto* trigger=menu_.addAction("Open Selection Actions",this,&Application::triggerManualActions);
@@ -16,7 +17,7 @@ void Application::setupManual() {
     connect(&manualPalette_,&ManualActionPalette::featureChosen,this,[this](Feature feature,const Selection& value){
         if(!controller_.busy()) controller_.runSelection(feature,value);
     });
-    connect(&controller_,&AppController::loading,this,[this]{manualPalette_.hide();});
+    connect(&controller_,&AppController::loading,this,[this]{++manualGeneration_;if(resolver_)resolver_->cancel();manualPalette_.hide();});
     if(shortcut_) {
         connect(shortcut_,&IGlobalShortcut::activated,this,&Application::triggerManualActions);
         connect(shortcut_,&IGlobalShortcut::statusChanged,this,&Application::refreshManualDiagnostics);
@@ -28,17 +29,24 @@ void Application::setupManual() {
 }
 void Application::triggerManualActions() {
     actionBar_.hideBar();
+    const auto generation=++manualGeneration_;
+    if(resolver_) resolver_->cancel();
+    manualPalette_.hide();
     if(controller_.busy()) {
         manualPalette_.showMessage("AI request in progress. Finish or cancel it before choosing another action.");
         return;
     }
-    const auto resolved=resolver_?resolver_->resolve():std::optional<ResolvedSelection>{};
-    lastManualSource_=resolved?selectionSourceName(resolved->source):"none";
-    lastManualCharacters_=resolved?resolved->selection.text.size():0;
-    lastManualTrigger_=QDateTime::currentDateTimeUtc();
-    if(resolved) manualPalette_.showSelection(*resolved);
-    else manualPalette_.showMessage("No selected text found.\nSelect text again and trigger, or copy text first.\nMaximum: 100,000 characters.");
-    refreshManualDiagnostics();
+    QPointer<Application> guard(this);
+    auto completed=[guard,generation](std::optional<ResolvedSelection> resolved){
+        if(!guard || guard->manualGeneration_!=generation || guard->controller_.busy())return;
+        guard->lastManualSource_=resolved?selectionSourceName(resolved->source):"none";
+        guard->lastManualCharacters_=resolved?resolved->selection.text.size():0;
+        guard->lastManualTrigger_=QDateTime::currentDateTimeUtc();
+        if(resolved) guard->manualPalette_.showSelection(*resolved);
+        else guard->manualPalette_.showMessage("No selected text found.\nSelect text again and trigger, or copy text first.\nMaximum: 100,000 characters.");
+        guard->refreshManualDiagnostics();
+    };
+    if(resolver_)resolver_->resolveAsync(this,std::move(completed));else completed({});
 }
 void Application::setShortcutEnabled(bool enabled) {
     settingsStore_.setValue("shortcut/enabled",enabled); settingsStore_.sync();
@@ -52,7 +60,7 @@ void Application::refreshManualDiagnostics() {
     const auto s=shortcut_?shortcut_->status():GlobalShortcutStatus{};
     const auto text=QString("Global shortcut preference: %1\nBackend: %2\nAvailable: %3; Registered: %4\n"
         "Preferred: %5; Actual: %6\nPortal version: %7\nStatus / last error: %8\nLast activation: %9\n"
-        "AT-SPI cache: %10; PRIMARY supported: %11\nClipboard: explicit fallback only (not read for diagnostics)\n"
+        "Native selection cache: %10; PRIMARY supported: %11\nClipboard: explicit fallback only (not read for diagnostics)\n"
         "Last manual resolution: source=%12 characters=%13 at=%14\nExternal trigger: worksidekick --trigger; tray trigger available")
         .arg(settingsStore_.value("shortcut/enabled",false).toBool()?"enabled":"disabled",
              s.backend,s.available?"yes":"no",s.registered?"yes":"no",PreferredShortcut,s.triggerDescription.isEmpty()?"none":s.triggerDescription,

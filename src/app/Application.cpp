@@ -43,7 +43,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     menu_.addAction("Settings", this, &Application::openSettings);
     menu_.addAction("Diagnostics", this, &Application::openDiagnostics);
     menu_.addAction("About", this, [this] {
-        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.5 — M4\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
+        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.6 — M5\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
     });
     menu_.addSeparator(); menu_.addAction("Quit", qApp, &QApplication::quit);
     tray_.setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
@@ -87,7 +87,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     setupManual();
     setupProduct();
 }
-Application::~Application() { if (shortcut_) shortcut_->stop(); if (monitor_) monitor_->stop(); }
+Application::~Application() { ++manualGeneration_; if (resolver_) resolver_->cancel(); if (shortcut_) shortcut_->stop(); if (monitor_) monitor_->stop(); }
 void Application::openWorkspace() { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); }
 void Application::start(bool showWorkspace) {
     if (shortcut_ && settingsStore_.value("shortcut/enabled",false).toBool()) shortcut_->start(false);
@@ -105,14 +105,14 @@ void Application::refreshDiagnostics() {
     refreshManualDiagnostics();
     refreshProductDiagnostics();
     diagnosticsText_->setPlainText(QString(
-        "WorkSidekick 0.5 — M4\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
-        "Selection mode: AT-SPI toolbar / MANUAL CLIPBOARD\nAT-SPI runtime status: see local selection panel below\n"
-        "Manual fallback: see M3 panel\nPortal probe: on explicit enable / enabled startup\n"
-        "Shortcut status: see M3 panel\nAutomatic popup: see overlay panel\n"
+        "WorkSidekick 0.6 — M5\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
+        "Selection mode: native selection toolbar / explicit clipboard\nNative selection status: see local selection panel below\n"
+        "Manual fallback: see selection actions panel\nPortal probe: on explicit enable / enabled startup\n"
+        "Shortcut status: see selection actions panel\nAutomatic popup: see overlay panel\n"
         "Secret backend: %6\nLast key status: %7\nAI provider: see product panel\nModel configured: %8\n"
         "System tray detected: %9\nEndpoint: selected provider HTTPS endpoint\nTimeout: 30 seconds")
-        .arg(QSysInfo::prettyProductName(), qEnvironmentVariable("XDG_CURRENT_DESKTOP", "unknown"),
-             qEnvironmentVariable("XDG_SESSION_TYPE", "unknown"), qVersion(), QGuiApplication::platformName(),
+        .arg(QSysInfo::prettyProductName(), qEnvironmentVariable("XDG_CURRENT_DESKTOP", "n/a"),
+             qEnvironmentVariable("XDG_SESSION_TYPE", "n/a"), qVersion(), QGuiApplication::platformName(),
              secrets_.description(), keyStatus_, Settings::load(settingsStore_).model.isEmpty() ? "no" : "yes",
              QSystemTrayIcon::isSystemTrayAvailable() ? "yes" : "no"));
 }

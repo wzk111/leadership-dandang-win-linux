@@ -11,7 +11,7 @@
 int main(int argc, char** argv) {
     ws::preparePlatformEventLoop();
     QApplication app(argc, argv);
-    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.5.0");
+    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.6.0");
     QCommandLineParser parser; parser.setApplicationDescription("Explicit selection AI assistant");
     parser.addHelpOption(); parser.addVersionOption();
     parser.addOption({"smoke-test", "Open windows with synthetic data, make no network calls, then exit."});

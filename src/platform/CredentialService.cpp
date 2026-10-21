@@ -29,7 +29,10 @@ bool CredentialService::read(){return start(0);}
 bool CredentialService::save(const QString& key){return !key.trimmed().isEmpty() && start(1,key.trimmed());}
 bool CredentialService::remove(){return start(2);}
 bool CredentialService::busy()const{return active_;}
-QString CredentialService::description()const{return "Provider-specific libsecret / Secret Service (availability checked on use)";}
+QString CredentialService::description()const{
+    const auto* store=stores_.value(selected_);
+    return store?"Provider-specific credentials: "+store->description():"Credential backend unavailable";
+}
 QString CredentialService::credentialStatus(const QString& provider)const{return status_.value(provider,"not checked");}
 bool CredentialService::start(int operation,const QString& key) {
     auto* store=stores_.value(selected_);

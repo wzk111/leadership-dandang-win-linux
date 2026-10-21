@@ -37,9 +37,9 @@ SelectionDiagnostics::SelectionDiagnostics(ISelectionMonitor* monitor, QWidget* 
     refresh();
 }
 void SelectionDiagnostics::refresh() {
-    if(!monitor_) { metadata_->setPlainText("AT-SPI monitor not attached (test/shared build)."); return; }
+    if(!monitor_) { metadata_->setPlainText("Native selection monitor not attached (test/shared build)."); return; }
     const auto s=monitor_->status(); const auto last=monitor_->latestSelection();
-    QString text=QString("Backend: %1\nAT-SPI available: %2; initialized: %3; listener running: %4\n%5\nEvents received: %6\nLast event (UTC): %7\nLast result: %8\nAI triggered automatically: NO\nSelection mode for AI: MANUAL CLIPBOARD")
+    QString text=QString("Backend: %1\nBackend available: %2; initialized: %3; listener running: %4\n%5\nEvents received: %6\nLast event (UTC): %7\nLast result: %8\nAI triggered automatically: NO\nSelection mode for AI: MANUAL CLIPBOARD")
         .arg(monitor_->backendName(),s.available?"yes":"no",s.initialized?"yes":"no",s.running?"yes":"no",
              s.description,QString::number(s.events),s.lastEvent.isValid()?s.lastEvent.toString(Qt::ISODate):"none",s.lastResult);
     if(last) {
@@ -47,9 +47,9 @@ void SelectionDiagnostics::refresh() {
             .arg(last->sourceApplication).arg(last->text.size()).arg(last->anchorRect?"yes":"no");
         if(last->anchorRect) {
             const auto r=*last->anchorRect;
-            text+=QString("\nAT-SPI screen coordinates: x=%1 y=%2 w=%3 h=%4").arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height());
+            text+=QString("\nBackend screen coordinates: x=%1 y=%2 w=%3 h=%4").arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height());
         }
-    } else text+="\nNo AT-SPI text selection detected yet. Select text in another accessible application and try again.";
+    } else text+="\nNo native text selection detected yet. Select text in another accessible application and try again.";
     // Avoid resetting accessible text/cursor for identical metadata.
     if(metadata_->toPlainText()!=text) metadata_->setPlainText(text);
 }

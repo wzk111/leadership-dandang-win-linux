@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QDateTime>
 #include "core/Core.h"
+#include "core/SelectionResolver.h"
 namespace ws {
 struct MonitorStatus {
     bool available = false;
@@ -21,6 +22,7 @@ public:
     virtual MonitorStatus status() const = 0;
     virtual std::optional<Selection> latestSelection() const = 0;
     virtual QString backendName() const = 0;
+    virtual SelectionSource selectionSource() const { return SelectionSource::AtSpi; }
 signals:
     void selectionDetected(const ws::Selection& selection);
     void selectionCleared();

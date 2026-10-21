@@ -21,7 +21,7 @@ void Application::setupProduct() {
     connect(&controller_,&AppController::loading,this,[this] { settings_.setRequestBusy(true); refreshProductDiagnostics(); });
     connect(&controller_,&AppController::finished,this,[this] { settings_.setRequestBusy(false); refreshProductDiagnostics(); });
     connect(&actionBar_,&ActionBar::moreRequested,this,[this](const Selection& snapshot) {
-        if (!controller_.busy()) manualPalette_.showSelection({snapshot,SelectionSource::AtSpi});
+        if (!controller_.busy()) manualPalette_.showSelection({snapshot,monitor_?monitor_->selectionSource():SelectionSource::AtSpi});
     });
     refreshFeaturePreferences(); refreshProductDiagnostics();
 }

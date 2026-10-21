@@ -76,7 +76,7 @@ void Application::refreshOverlayDiagnostics() {
         return r ? QString("x=%1 y=%2 w=%3 h=%4").arg(r->x()).arg(r->y()).arg(r->width()).arg(r->height()) : QString("none");
     };
     const auto text = QString("Automatic toolbar preference: %1\nOverlay capability: %2\nQt platform: %3\n"
-        "Status: %4\nLast selection anchor (raw AT-SPI): %5\nLast toolbar placement (requested Qt): %6\n"
+        "Status: %4\nLast selection anchor (raw backend screen coordinates): %5\nLast toolbar placement (requested Qt): %6\n"
         "Placement mode: %7\nSource focus preserved on this desktop: NOT TESTED\nHiDPI mapping: NOT TESTED")
         .arg(settingsStore_.value("ui/automaticPopup",false).toBool() ? "enabled" : "disabled",
              windowPolicy_ ? windowPolicy_->description() : "Unsupported: no platform window policy",

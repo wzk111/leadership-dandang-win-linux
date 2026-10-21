@@ -20,5 +20,22 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build Release
         run: cmake --build build --parallel 2
-      - name: Shared product tests
+      - name: Shared and native tests
         run: ctest --test-dir build --output-on-failure
+      - name: Launch smoke
+        run: |
+          $process = Start-Process -FilePath .\build\worksidekick.exe -ArgumentList '--smoke-test' -PassThru -Wait -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Launch smoke failed: $($process.ExitCode)" }
+      - name: Package native validation binaries
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force build\portable | Out-Null
+          Copy-Item build\*.exe build\portable
+          Get-ChildItem build\portable\*.exe | ForEach-Object { & windeployqt --release --no-translations $_.FullName; if ($LASTEXITCODE -ne 0) { throw 'Deployment failed' } }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-release-native-tests
+          path: |
+            build/portable/
+            build/Testing/Temporary/LastTest.log
