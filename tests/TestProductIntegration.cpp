@@ -60,6 +60,25 @@ private slots:
     int visible=0;for(int i=0;i<6;++i)if(!bar->findChild<QPushButton*>(QString("action%1").arg(i))->isHidden())++visible;
     QVERIFY(visible>=3 && visible<=5);QCOMPARE(ai.calls,0);QCOMPARE(secret.reads,0);
  }
+ void morePreservesSnapshotWithoutRequest(){
+    QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);
+    IntegrationAI ai;IntegrationSecret secret;IntegrationSelection selection;AppController c(ai,secret,selection,s);Application app(c,secret,s);
+    auto* bar=window<ActionBar>();auto* manual=window<ManualActionPalette>();
+    Selection source{"original A",{},"fixture"};bar->showForSelection(source,{10,10});source.text="new B";
+    bar->findChild<QPushButton*>("moreActions")->click();
+    QVERIFY(!bar->isVisible());QVERIFY(manual->isVisible());QVERIFY(manual->currentSelection());
+    QCOMPARE(manual->currentSelection()->selection.text,QString("original A"));
+    QCOMPARE(ai.calls,0);QCOMPARE(secret.reads,0);
+ }
+ void diagnosticsExcludeContent(){
+    QTemporaryDir d;QSettings s(d.filePath("s.ini"),QSettings::IniFormat);
+    s.setValue("profile/role","PRIVATE_PROFILE");s.setValue("profile/enabled",true);
+    IntegrationAI ai;IntegrationSecret secret;IntegrationSelection selection;AppController c(ai,secret,selection,s);Application app(c,secret,s);
+    app.openDiagnostics();bool found=false;
+    for(auto* w:QApplication::topLevelWidgets())for(auto* p:w->findChildren<QPlainTextEdit*>())
+        if(p->objectName()=="productMetadata") {found=true;QVERIFY(!p->toPlainText().contains("PRIVATE_PROFILE"));QVERIFY(p->toPlainText().contains("Profile enabled: yes"));}
+    QVERIFY(found);QCOMPARE(ai.calls,0);QCOMPARE(secret.reads,0);
+ }
 };
 QTEST_MAIN(TestProductIntegration)
 #include "TestProductIntegration.moc"

@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include "core/Core.h"
+#include "core/FeaturePreferences.h"
 class QPlainTextEdit;
 class QLabel;
 class QPushButton;
@@ -11,6 +12,7 @@ public:
     explicit WorkspaceWindow(QWidget* parent = nullptr);
     void setCaptured(const QString& text);
     void setBusy(bool busy);
+    void setPreferences(const FeaturePreferences& preferences);
     void setTrayAvailable(bool available);
 signals:
     void processClipboard();
@@ -23,5 +25,6 @@ private:
     QLabel* trayNotice_;
     QPushButton* process_;
     QList<QPushButton*> features_;
+    bool busy_ = false;
 };
 }

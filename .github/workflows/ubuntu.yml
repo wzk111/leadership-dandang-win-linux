@@ -1,4 +1,4 @@
-name: Ubuntu M3
+name: Ubuntu M4
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read

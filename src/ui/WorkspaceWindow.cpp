@@ -5,6 +5,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QGridLayout>
 namespace ws {
 WorkspaceWindow::WorkspaceWindow(QWidget* parent) : QWidget(parent) {
     setWindowTitle("WorkSidekick"); resize(610, 460);
@@ -18,12 +19,12 @@ WorkspaceWindow::WorkspaceWindow(QWidget* parent) : QWidget(parent) {
     count_ = new QLabel("No text loaded", this);
     preview_ = new QPlainTextEdit(this); preview_->setObjectName("clipboardPreview"); preview_->setReadOnly(true);
     preview_->setPlaceholderText("Nothing is read until you click Process Clipboard.");
-    auto* actions = new QHBoxLayout;
+    auto* actions = new QGridLayout;
     for (const auto& f : FeatureRegistry::all()) {
         auto* button = new QPushButton(f.name, this);
         button->setToolTip(f.description); button->setEnabled(false);
         button->setObjectName("feature" + QString::number(static_cast<int>(f.id)));
-        features_.append(button); actions->addWidget(button);
+        features_.append(button); actions->addWidget(button,(features_.size()-1)/3,(features_.size()-1)%3);
         connect(button, &QPushButton::clicked, this, [this, id = f.id] { emit featureChosen(id); });
     }
     auto* footer = new QHBoxLayout;
@@ -44,8 +45,14 @@ void WorkspaceWindow::setCaptured(const QString& text) {
     setBusy(false);
 }
 void WorkspaceWindow::setBusy(bool busy) {
+    busy_ = busy;
     process_->setEnabled(!busy);
-    for (auto* button : features_) button->setEnabled(!busy && !preview_->toPlainText().trimmed().isEmpty());
+    for (auto* button : features_) button->setEnabled(!busy && !button->isHidden() && !preview_->toPlainText().trimmed().isEmpty());
+}
+void WorkspaceWindow::setPreferences(const FeaturePreferences& preferences) {
+    for (const auto& f : FeatureRegistry::all())
+        findChild<QPushButton*>("feature"+QString::number(int(f.id)))->setVisible(preferences.enabled.contains(f.stableId));
+    setBusy(busy_);
 }
 void WorkspaceWindow::setTrayAvailable(bool available) {
     trayNotice_->setText(available ? "Closing a window keeps WorkSidekick in the tray. Use Quit to exit."

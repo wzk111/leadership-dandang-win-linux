@@ -1,5 +1,6 @@
 #include "../PlatformFactory.h"
 #include "LinuxSecretStore.h"
+#include "../CredentialService.h"
 #include "AtSpiSelectionMonitor.h"
 #include "LinuxWindowPolicy.h"
 #include "LinuxSelectionResolver.h"
@@ -7,6 +8,7 @@
 #include "PortalGlobalShortcut.h"
 #include "QtPortalTransport.h"
 #include <QGuiApplication>
+#include <QStringList>
 #include <X11/Xlib.h>
 namespace ws {
 std::unique_ptr<IPlatformWindowPolicy> createWindowPolicy() { return std::make_unique<LinuxWindowPolicy>(); }
@@ -31,5 +33,10 @@ std::unique_ptr<IGlobalShortcut> createGlobalShortcut() {
 std::unique_ptr<IExplicitSelectionResolver> createExplicitResolver(ISelectionMonitor* monitor,QClipboard& clipboard) {
     return std::make_unique<LinuxSelectionResolver>(monitor,clipboard);
 }
-std::unique_ptr<ISecretStore> createSecretStore() { return std::make_unique<LinuxSecretStore>(); }
+std::unique_ptr<ISecretStore> createSecretStore() {
+    QMap<QString,ISecretStore*> stores;
+    for(const auto& id:QStringList{"openai","anthropic","gemini","openai_compatible"})
+        stores.insert(id,new LinuxSecretStore(nullptr,id));
+    return std::make_unique<CredentialService>(stores);
+}
 }

@@ -25,7 +25,8 @@ SecretResult operate(int operation, const QString& account, const QString& key) 
         if (password) value = QString::fromUtf8(password.get());
     } else if (operation == 1) {
         auto bytes = key.toUtf8();
-        ok = secret_password_store_sync(&schema, SECRET_COLLECTION_DEFAULT, "WorkSidekick OpenAI API key",
+        const auto label = (QString("WorkSidekick API key — ") + account).toUtf8();
+        ok = secret_password_store_sync(&schema, SECRET_COLLECTION_DEFAULT, label.constData(),
                                         bytes.constData(), nullptr, &rawError,
                                         "account", accountBytes.constData(), nullptr);
         bytes.fill('\0');

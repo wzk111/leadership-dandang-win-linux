@@ -30,6 +30,10 @@ public:
     bool smokeCheck();
 private:
     void refreshDiagnostics();
+    void setupProduct();
+    void refreshProductDiagnostics();
+    void refreshFeaturePreferences();
+    QPlainTextEdit* productText_ = nullptr;
     void setupManual();
     void setShortcutEnabled(bool enabled);
     void refreshManualDiagnostics();

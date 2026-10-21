@@ -6,6 +6,7 @@ trap 'rm -rf -- "$test_home"' EXIT
 export HOME="$test_home"
 export XDG_DATA_HOME="$test_home/.local/share"
 export XDG_CONFIG_HOME="$test_home/.config"
+export WORKSIDEKICK_TEST_ISOLATED_KEYRING=1
 mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
 eval "$(printf 'ci-test-password' | gnome-keyring-daemon --unlock --components=secrets)"
 ./build/test_secret

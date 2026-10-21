@@ -13,5 +13,6 @@ private:
     QMap<QString,IAIProvider*> providers_;
     IAIProvider* active_=nullptr;
     bool pendingError_=false;
+    bool pendingCancelled_=false;
 };
 }

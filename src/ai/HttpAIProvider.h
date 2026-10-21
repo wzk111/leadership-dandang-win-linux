@@ -16,12 +16,14 @@ public:
     bool busy() const override;
     static AIResult failure(AIError,const QString& provider);
 protected:
+    static AIError transportError(int,QNetworkReply::NetworkError);
     virtual QJsonObject payload(const AIRequest&) const=0;
     virtual void authorize(QNetworkRequest&,const QString&) const=0;
     virtual AIResult parse(int,QNetworkReply::NetworkError,const QByteArray&) const=0;
     virtual QUrl endpointFor(const AIRequest&) const;
     QString provider_;
 private:
+    void readAvailable(QNetworkReply*);
     void finishLater(AIError);
     QNetworkAccessManager network_;
     QPointer<QNetworkReply> reply_;

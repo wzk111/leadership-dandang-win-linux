@@ -5,6 +5,9 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QTemporaryDir>
+#include "app/AppController.h"
+#include "core/Profile.h"
 #include "ai/OpenAIProvider.h"
 #include "ai/AnthropicProvider.h"
 #include "ai/GeminiProvider.h"
@@ -42,6 +45,15 @@ static std::unique_ptr<IAIProvider> make(const QString& id,Server& s,int timeout
     return std::make_unique<OpenAIProvider>(nullptr,QUrl(s.base().toString()+"/responses"),timeout);
 }
 static AIRequest request(const QString& id,Server& s){return {{"system task","source text",{}},"configured-model","synthetic-key",1234,id,s.base().toString()};}
+class HTTPSecret:public ISecretStore {
+public:
+    bool read()override{QTimer::singleShot(0,this,[this]{emit readFinished({"synthetic-key",{}});});return true;}
+    bool save(const QString&)override{return false;}bool remove()override{return false;}
+    bool busy()const override{return false;}QString description()const override{return "fake";}
+};
+class HTTPSelection:public ISelectionProvider {
+public:std::optional<Selection> currentSelection()override{return std::nullopt;}
+};
 class TestProviders:public QObject {
  Q_OBJECT
 private slots:
@@ -97,6 +109,30 @@ private slots:
     QSignalSpy spy(&service,&IAIProvider::completed);QVERIFY(service.generate(request("anthropic",a)));QVERIFY(!service.generate(request("openai",b)));
     QTRY_COMPARE(spy.size(),1);QCOMPARE(qvariant_cast<AIResult>(spy[0][0]).error,AIError::Authentication);
     QVERIFY(service.generate(request("openai",b)));QTRY_COMPARE(spy.size(),2);QCOMPARE(qvariant_cast<AIResult>(spy[1][0]).error,AIError::None);QCOMPARE(a.requests,1);QCOMPARE(b.requests,1);
+ }
+ void productPrivacyOverHTTP(){
+    Server server;server.body=success("openai");
+    OpenAIProvider ai(nullptr,QUrl(server.base().toString()+"/responses"));HTTPSecret secret;HTTPSelection selection;
+    QTemporaryDir dir;QSettings settings(dir.filePath("settings.ini"),QSettings::IniFormat);
+    Settings{"snapshot-model","English"}.save(settings);Profile profile;profile.role="PRIVATE_PROFILE_A";QVERIFY(profile.save(settings));
+    settings.setValue("profile/enabled",true);AppController controller(ai,secret,selection,settings);QSignalSpy done(&controller,&AppController::finished);
+    int count=0;
+    for(auto feature:{Feature::PlainSpeak,Feature::Summarize,Feature::Polish,Feature::Relevance,Feature::AddInsight}) {
+        QVERIFY(controller.runSelection(feature,{"SOURCE_A",{}, {}}));++count;QTRY_COMPARE(done.size(),count);
+        QCOMPARE(server.captured.contains("PRIVATE_PROFILE_A"),feature==Feature::Relevance || feature==Feature::AddInsight);
+    }
+    settings.setValue("profile/enabled",false);QVERIFY(controller.runSelection(Feature::Relevance,{"SOURCE_A",{}, {}}));
+    ++count;QTRY_COMPARE(done.size(),count);QVERIFY(!server.captured.contains("PRIVATE_PROFILE_A"));
+    const int before=server.requests;QVERIFY(controller.runSelection(Feature::Reply,{"SOURCE_A",{}, {}}));QTest::qWait(20);QCOMPARE(server.requests,before);
+    settings.setValue("profile/enabled",true);QVERIFY(controller.generateReply({"SOURCE_A",{}, {}},"Professional","PRIVATE_INTENT"));
+    ++count;QTRY_COMPARE(done.size(),count);QVERIFY(server.captured.contains("PRIVATE_PROFILE_A"));QVERIFY(server.captured.contains("PRIVATE_INTENT"));
+    profile.role="PRIVATE_PROFILE_B";QVERIFY(profile.save(settings));Settings{"changed-model","English"}.save(settings);
+    QVERIFY(controller.refine("Shorter"));++count;QTRY_COMPARE(done.size(),count);
+    QVERIFY(server.captured.contains("visible answer"));QVERIFY(server.captured.contains("SOURCE_A"));QVERIFY(server.captured.contains("snapshot-model"));
+    QVERIFY(!server.captured.contains("PRIVATE_PROFILE_B"));
+    QVERIFY(controller.refine("Regenerate"));++count;QTRY_COMPARE(done.size(),count);QVERIFY(!server.captured.contains("current_result"));
+    QVERIFY(controller.testConnection());++count;QTRY_COMPARE(done.size(),count);
+    QVERIFY(!server.captured.contains("PRIVATE_PROFILE"));QVERIFY(!server.captured.contains("SOURCE_A"));QVERIFY(!server.captured.contains("PRIVATE_INTENT"));
  }
 };
 QTEST_GUILESS_MAIN(TestProviders)

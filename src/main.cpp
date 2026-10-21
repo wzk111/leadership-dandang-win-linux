@@ -3,7 +3,7 @@
 #include <QSettings>
 #include <QTimer>
 #include <QTextStream>
-#include "ai/OpenAIProvider.h"
+#include "ai/AIService.h"
 #include "platform/PlatformFactory.h"
 #include "platform/ClipboardSelectionProvider.h"
 #include "app/Application.h"
@@ -11,7 +11,7 @@
 int main(int argc, char** argv) {
     ws::preparePlatformEventLoop();
     QApplication app(argc, argv);
-    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.4.0");
+    app.setOrganizationName("WorkSidekick"); app.setApplicationName("WorkSidekick"); app.setApplicationVersion("0.5.0");
     QCommandLineParser parser; parser.setApplicationDescription("Explicit selection AI assistant");
     parser.addHelpOption(); parser.addVersionOption();
     parser.addOption({"smoke-test", "Open windows with synthetic data, make no network calls, then exit."});
@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     QSettings settings;
     auto secrets = ws::createSecretStore();
     ws::ClipboardSelectionProvider clipboard(*app.clipboard());
-    ws::OpenAIProvider ai;
+    ws::AIService ai;
     ws::AppController controller(ai, *secrets, clipboard, settings);
     auto monitor = ws::createSelectionMonitor();
     auto windowPolicy = ws::createWindowPolicy();

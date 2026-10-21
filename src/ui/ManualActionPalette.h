@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include "core/SelectionResolver.h"
+#include "core/FeaturePreferences.h"
 class QLabel;
 class QPlainTextEdit;
 class QPushButton;
@@ -11,6 +12,7 @@ public:
     ManualActionPalette();
     void showSelection(const ResolvedSelection& selection);
     void showMessage(const QString& message);
+    void setPreferences(const FeaturePreferences& preferences);
     std::optional<ResolvedSelection> currentSelection() const { return snapshot_; }
 signals:
     void featureChosen(ws::Feature feature, const ws::Selection& selection);

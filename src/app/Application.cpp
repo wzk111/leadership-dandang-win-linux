@@ -28,7 +28,9 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
         const auto& metric=controller_.metrics();result_.setMetadata(metric.provider+" · "+metric.model);
     });
     connect(&result_, &ResultCard::cancelRequested, &controller_, &AppController::cancel);
-    connect(&result_,&ResultCard::closed,&controller_,&AppController::clearGeneration);
+    connect(&result_,&ResultCard::closed,this,[this] {
+        controller_.clearGeneration(); workspace_.setBusy(false); settings_.setRequestBusy(false);
+    });
     connect(&result_,&ResultCard::refinementRequested,&controller_,&AppController::refine);
     connect(&controller_,&AppController::replyRequested,&reply_,&ReplyComposer::openSelection);
     connect(&reply_,&ReplyComposer::generateRequested,&controller_,&AppController::generateReply);
@@ -41,7 +43,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     menu_.addAction("Settings", this, &Application::openSettings);
     menu_.addAction("Diagnostics", this, &Application::openDiagnostics);
     menu_.addAction("About", this, [this] {
-        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.4 — M3\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
+        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.5 — M4\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
     });
     menu_.addSeparator(); menu_.addAction("Quit", qApp, &QApplication::quit);
     tray_.setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
@@ -69,7 +71,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     });
     connect(ai, &QPushButton::clicked, this, [this] {
         if (QMessageBox::question(&diagnostics_, "Test AI Connection",
-            "Send a short synthetic test message to OpenAI? API charges may apply. Your clipboard is not used.") == QMessageBox::Yes)
+            "Send a short synthetic test message to the selected provider? API charges may apply. Your clipboard and profile are not used.") == QMessageBox::Yes)
             controller_.testConnection();
     });
     connect(refresh, &QPushButton::clicked, this, &Application::refreshDiagnostics);
@@ -83,6 +85,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     });
     setupOverlay();
     setupManual();
+    setupProduct();
 }
 Application::~Application() { if (shortcut_) shortcut_->stop(); if (monitor_) monitor_->stop(); }
 void Application::openWorkspace() { workspace_.show(); workspace_.raise(); workspace_.activateWindow(); }
@@ -100,13 +103,14 @@ void Application::openDiagnostics() { refreshDiagnostics(); diagnostics_.show();
 void Application::refreshDiagnostics() {
     refreshOverlayDiagnostics();
     refreshManualDiagnostics();
+    refreshProductDiagnostics();
     diagnosticsText_->setPlainText(QString(
-        "WorkSidekick 0.4 — M3\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
+        "WorkSidekick 0.5 — M4\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
         "Selection mode: AT-SPI toolbar / MANUAL CLIPBOARD\nAT-SPI runtime status: see local selection panel below\n"
         "Manual fallback: see M3 panel\nPortal probe: on explicit enable / enabled startup\n"
         "Shortcut status: see M3 panel\nAutomatic popup: see overlay panel\n"
-        "Secret backend: %6\nLast key status: %7\nAI provider: OpenAI Responses\nModel configured: %8\n"
-        "System tray detected: %9\nEndpoint: https://api.openai.com/v1/responses\nTimeout: 30 seconds")
+        "Secret backend: %6\nLast key status: %7\nAI provider: see product panel\nModel configured: %8\n"
+        "System tray detected: %9\nEndpoint: selected provider HTTPS endpoint\nTimeout: 30 seconds")
         .arg(QSysInfo::prettyProductName(), qEnvironmentVariable("XDG_CURRENT_DESKTOP", "unknown"),
              qEnvironmentVariable("XDG_SESSION_TYPE", "unknown"), qVersion(), QGuiApplication::platformName(),
              secrets_.description(), keyStatus_, Settings::load(settingsStore_).model.isEmpty() ? "no" : "yes",

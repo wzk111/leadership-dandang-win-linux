@@ -3,6 +3,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QNetworkRequest>
+#include <algorithm>
 namespace ws {
 namespace {
 AIResult failure(AIError error) {
@@ -59,7 +60,8 @@ bool OpenAIProvider::generate(const AIRequest& r) {
     request.setRawHeader("Authorization", "Bearer " + r.apiKey.toUtf8());
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     const QJsonObject payload{{"model", r.model.trimmed()}, {"instructions", r.prompt.system},
-                              {"input", r.prompt.user}, {"store", false}};
+                              {"input", r.prompt.user}, {"store", false},
+                              {"max_output_tokens", std::clamp(r.maxOutputTokens, 1, 16384)}};
     body_.clear();
     abortReason_ = AIError::None;
     reply_ = network_.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
