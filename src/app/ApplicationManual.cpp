@@ -61,12 +61,13 @@ void Application::refreshManualDiagnostics() {
     const auto text=QString("Global shortcut preference: %1\nBackend: %2\nAvailable: %3; Registered: %4\n"
         "Preferred: %5; Actual: %6\nPortal version: %7\nStatus / last error: %8\nLast activation: %9\n"
         "Native selection cache: %10; PRIMARY supported: %11\nClipboard: explicit fallback only (not read for diagnostics)\n"
-        "Last manual resolution: source=%12 characters=%13 at=%14\nExternal trigger: worksidekick --trigger; tray trigger available")
+        "Last manual resolution: source=%12 characters=%13 at=%14\nExternal trigger: worksidekick --trigger; tray trigger available\nResolution order: %15")
         .arg(settingsStore_.value("shortcut/enabled",false).toBool()?"enabled":"disabled",
              s.backend,s.available?"yes":"no",s.registered?"yes":"no",PreferredShortcut,s.triggerDescription.isEmpty()?"none":s.triggerDescription,
              s.portalVersion?QString::number(s.portalVersion):"n/a",s.description,s.lastActivation.toString(Qt::ISODate),
              monitor_ && monitor_->latestSelection()?"available":"none",resolver_ && resolver_->primarySupported()?"yes":"no",
-             lastManualSource_,QString::number(lastManualCharacters_),lastManualTrigger_.toString(Qt::ISODate));
+             lastManualSource_,QString::number(lastManualCharacters_),lastManualTrigger_.toString(Qt::ISODate),
+             resolver_?resolver_->description():QString("Unavailable"));
     if(manualText_->toPlainText()!=text) manualText_->setPlainText(text);
 }
 }
