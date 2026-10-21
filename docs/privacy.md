@@ -1,75 +1,70 @@
-# Privacy
+# Privacy — M4
 
-- Only Process Clipboard reads the current clipboard into the working preview.
-  Diagnostics Test Clipboard is another explicit read and shows only its length.
-- AI runs only on a feature click, or an explicitly confirmed synthetic connection
-  test. M0 has no automatic monitoring, hooks, accessibility scanning or uploads.
-- Requests contain the selected preview and action instructions. No profile,
-  screenshots, app contents, clipboard history or conversation history is sent.
-- API keys use libsecret/Secret Service. Settings contain model, language and the automatic-toolbar preference.
-  The key field is masked and cleared after save and on close.
-- Requests use the fixed official HTTPS endpoint, normal TLS validation and no
-  automatic redirects. Tests inject only a loopback HTTP endpoint.
-- Responses API requests set store=false. This disables API response storage;
-  it is not a promise of zero retention by the provider. Review
-  [OpenAI data controls](https://platform.openai.com/docs/guides/your-data).
-- The application emits no private-content logs and does not show raw API or
-  keyring error payloads. Qt/system libraries may emit generic diagnostics.
-- Text and keys necessarily exist in process memory while used. Qt strings and
-  network buffers cannot guarantee complete memory zeroization. There is no
-  on-disk content history. The result is cleared when its window closes.
-- Copy result intentionally replaces the clipboard. Other applications or an OS
-  clipboard manager may retain it; WorkSidekick does not implement such a history.
-- Cancelling stops local waiting/network activity; it cannot recall text already
-  transmitted to the API or guarantee reversal of provider charges.
-- This application never clicks Send, submits forms, injects keystrokes or requires
-  a privileged runtime process.
+Selecting text, showing the toolbar, opening Reply, editing Profile, switching
+providers, saving preferences, triggering a shortcut and displaying diagnostics
+make no AI request. Process Clipboard and explicit manual triggers read locally.
+AI requires a feature click, Generate reply, a result refinement, or confirmation
+of the synthetic connection test. API charges may apply.
 
-## M1 local accessibility extension
+Plain Speak, Summarize and Polish send source text and instructions, never Profile.
+Reply, Relevance and Add Insight include saved Profile only when inclusion is
+enabled (default OFF). Reply also includes optional intent and chosen stance.
+Source and context are separate prompt data fields; this is an instruction
+boundary, not a guarantee against all prompt injection.
 
-M1 additionally observes object:text-selection-changed. It retrieves only the event
-source's selected range into local memory, with size limits and a 45-second expiry.
-There is no AI/upload connection from this monitor. Source text is absent from
-metadata; Show Last Selection Preview is required to display it. Preview clears
-on change/stop/expiry/hide. No selected text is logged, persisted or copied by M1.
-This updates the earlier M0-only statement that the app has no automatic monitor;
-there is still no keyboard monitoring, general text-change listener or scraping.
+Regenerate sends the original request snapshot. Adjustments send that snapshot
+and the latest successful result. Later selection, Profile or provider changes
+do not alter the context. Closing cancels locally and clears it. Failed
+adjustments preserve the previous successful result for review/copy.
 
-## M2 explicit selection action
+## Storage
 
-Automatic toolbar display is local and is not permission to upload. Only a
-Plain Speak, Summarize or Polish click sends the captured toolbar Selection
-through the existing AI pipeline. New selections replace the stored value; a
-hidden/cleared toolbar cannot execute a stale selection. No accessibility or
-clipboard read is performed when clicking the toolbar.
+The seven Profile fields are saved explicitly in local QSettings as **plain text,
+not encrypted**. Clear Profile removes them and disables inclusion. Avoid entering
+secrets. Settings also contain feature IDs, model, language, token limit, provider,
+compatible base URL and UI preferences. They contain no API keys.
 
-The toolbar shows feature labels, not source text. Diagnostics automatically
-shows capability, raw rectangle, requested placement and status only. The M1
-opt-in preview remains separate. The automatic-popup preference is non-sensitive
-and stored in QSettings, alongside the existing model/language keys.
+Keys use libsecret / Secret Service with separate provider accounts. Original
+`io.worksidekick.ApiKey` / `account=openai` remains unchanged. Other accounts are
+`anthropic`, `gemini` and `openai_compatible`. Deleting one preserves others.
+Masked key input clears on save, provider change and close. Saved keys are never
+read into it. An unavailable keyring has no plaintext fallback.
 
-Clipboard contents are untouched until an explicit Copy result. No global input
-hooks, input injection, automatic replacement, message sending, profile collection,
-new AI provider or selection history is added.
+Selected text and generated content have no persistent app history. Current
+selection/result snapshots exist in memory. Qt strings and network buffers cannot
+guarantee complete memory zeroization. Copy result intentionally changes the
+clipboard, which an external clipboard manager may retain.
 
-## M3 explicit manual fallback
+## Network and diagnostics
 
-Shortcut activation and --trigger are local consent to read/preview, not consent
-to upload. On explicit trigger only, the resolver tries cached AT-SPI, read-only
-X11 PRIMARY where supported, then Clipboard. The palette visibly identifies its
-source so a user can reject stale clipboard data. The complete value snapshot is
-preserved behind the bounded local preview; only a feature click sends it to AI.
+Production endpoints require HTTPS and TLS validation, without redirects.
+Compatible URLs reject embedded credentials, query strings and fragments.
+HTTP is a constructor-injected loopback test facility only. Keys use headers,
+not URLs. Synthetic tests use no paid API.
 
-No periodic PRIMARY/clipboard reads, change listener, history or content logging
-is introduced. Closing/hiding the palette clears its snapshot and preview.
-Shortcut settings are independent of automatic toolbar settings. The default is
-OFF; portal permission/configuration UI requires explicit enable/retry.
+OpenAI Responses and Gemini Interactions set `store=false`; Anthropic uses a
+stateless Messages request. This does not promise zero provider retention.
+Each provider's data policies apply. Compatible hosts must support Responses,
+not only Chat Completions.
 
-X11 observes only the registered key combination, not general keyboard content.
-XTest belongs solely to the integration-test target; it is not linked by the
-production shortcut backend. No production input injection, automatic paste,
-replacement or message sending is implemented.
+Errors use generic descriptions, never raw response/keyring bodies. The app does
+not log source, generated text, Profile contents or keys. Diagnostics show feature
+names, Profile enabled/character count, provider/model configured status, credential
+availability and last request provider/duration/error only. Selection previews
+require the explicit M1 preview action. Qt/system libraries may emit generic logs.
 
-Single-instance IPC uses only a user-restricted local socket and commands, no
-public TCP port. Linux peer uid is checked. No selected text or API key crosses
-this IPC channel. The existing Secret Service storage remains unchanged.
+Cancellation cannot recall already sent data, guarantee remote cancellation or
+reverse API charges.
+
+## Preserved Linux boundaries
+
+AT-SPI listens only for selection events, extracts bounded selected ranges and
+expires its cache after 45 seconds. Toolbar display never uploads. Manual
+resolution reads cached AT-SPI, supported X11 PRIMARY, then Clipboard only after
+explicit trigger. No polling or clipboard history is added. Hidden palettes clear
+their snapshots. Keyboard handling observes only the registered shortcut.
+
+IPC uses a user-restricted local socket with Linux peer-UID checks and sends
+commands only. No general input monitoring, production input injection, automatic
+paste/replacement, message sending or privileged runtime daemon is added. Native
+Linux selection/overlay/shortcut implementations are preserved from M1–M3.

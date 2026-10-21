@@ -1,5 +1,36 @@
 # Troubleshooting
 
+## M4 product and provider checks
+
+- Missing action: open Settings → Features, enable it and Save settings. The toolbar
+  shows at most five quick actions; More and the manual palette expose the rest.
+  If all features are disabled, no automatic toolbar is shown.
+- Reply does nothing online when opened: this is intentional. Review the source,
+  choose a stance/optional intent, then Generate reply. Closing sends nothing.
+- Profile is not included: explicitly Save it and enable inclusion. Only Reply,
+  Relevance and Add Insight use it. Plain Speak, Summarize and Polish never do.
+  Profile is local plain text, not encrypted. Clear Profile also disables inclusion.
+- Profile deletion reports a write failure: inclusion is disabled in this session,
+  but the disk copy may return after restart. Fix local settings-file permissions
+  and retry Clear Profile; do not treat the failed deletion as completed.
+- Provider/model/key: each provider has independent settings and credentials.
+  Switching clears unsaved key input. Save API key securely affects only the
+  selected provider. API access/billing is separate from chat-product subscriptions.
+- Compatible endpoints: enter an HTTPS base such as `https://host/v1`, not a full
+  `/responses` URL. The server must implement Responses. URL credentials, query
+  strings, fragments and plain HTTP are rejected. No automatic protocol fallback.
+- Authentication errors: check the selected provider's key/project access. Rate
+  limits may indicate quota or billing. Safety refusals mean the provider blocked
+  the request. Raw server messages are deliberately not displayed.
+- A setting changed but Regenerate used the old value: each result retains its
+  original provider/model/Profile/source. Start a new action for new settings.
+- Cancel during keyring unlock: late key completion is ignored, but the underlying
+  desktop keyring operation can still be pending. Unlock/finish it before retrying.
+- Test provider asks before making a potentially billable synthetic request. It
+  never includes selected text or Profile. Real paid APIs were not tested in CI.
+
+For actual evidence and untested desktop combinations see [M4 verification](m4-completion.md).
+
 ## CMake cannot find Qt / WrapOpenGL
 
 Install qt6-base-dev and libgl1-mesa-dev. M0 supports the Ubuntu 22.04 package

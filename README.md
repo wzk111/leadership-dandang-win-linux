@@ -1,9 +1,9 @@
 # WorkSidekick
 
-A C++20 / Qt 6 desktop assistant for explicitly chosen text. On supported Linux
-backends, select text and click **Plain Speak**, **Summarize**, or **Polish** on the
-floating toolbar. Manual clipboard mode remains available. Review the result,
-then copy it yourself. AI uses the official OpenAI Responses API.
+A C++20 / Qt 6 desktop assistant for explicitly chosen text. M4 (0.5.0) adds
+**Plain Speak, Summarize, Polish, Reply, Relevance and Add Insight**, an optional
+local Profile, result refinements, and four provider choices. Review results and
+copy them yourself. Selecting text never sends an AI request.
 
 **Target:** Ubuntu 22.04 LTS. Native Windows integration is planned for M5.
 This is an independent implementation inspired by
@@ -127,28 +127,62 @@ See [M3 verification](docs/m3-completion.md) and
 ## First use / manual clipboard mode
 
 1. Launch the app and open **Settings**.
-2. Enter a Responses-compatible model ID available to your OpenAI API project.
+2. In **AI Providers**, choose OpenAI, Anthropic, Gemini or OpenAI-compatible,
+   and enter a model ID available to your API project.
    There is intentionally no permanent hard-coded model.
 3. Set the output language and click **Save settings**.
 4. Enter your API key and click **Save API key securely**. The key is stored by
    libsecret in the desktop's Secret Service (normally GNOME Keyring).
 5. Copy text in another application using Ctrl+C.
 6. In the tray menu or main window, click **Process Clipboard**.
-7. Review the captured preview and choose **Plain Speak**, **Summarize**, or **Polish**.
+7. Review the captured preview and choose an enabled feature. **Reply** opens a
+   local composer; only **Generate reply** sends it.
 8. Wait for the result, then click **Copy result**.
 
 Saving settings does not save the key; the secure-key button does that separately.
 A keyring unlock dialog may appear. Keys are never read back into the settings
-field. **Delete saved key** removes this app's stored OpenAI credential.
+field. **Delete saved key** removes only the selected provider's credential.
 
 Loading a preview makes **no API call**. Only choosing a feature sends that
 preview. Changing the clipboard afterward does not change an in-flight request.
 Cancel or close the result card to cancel. Copying a result deliberately replaces
 the current clipboard; there is no clipboard history or simulated Ctrl+C.
 
-An OpenAI API account with API access/billing is required. No key is bundled.
+A provider API account with API access/billing is required. No key is bundled.
 The network timeout is 30 seconds; failures appear in the result card.
 The model's availability and generated output must be validated with your account.
+
+## M4: personalized actions and providers
+
+**Settings → General → Edit Profile** opens seven optional fields. Save is explicit;
+Clear Profile removes them and disables inclusion. Profile is stored locally in
+plain QSettings, **not encrypted**. Inclusion defaults OFF. When enabled, only
+Reply, Relevance and Add Insight include it. Plain Speak, Summarize and Polish do
+not include Profile. Settings → Features chooses enabled actions, 3–5 toolbar
+quick actions (or all if fewer are enabled), and the default Polish style.
+**More…** opens the manual palette using the same captured selection.
+
+Reply lets you review the source, choose one of seven stances, and optionally
+enter intent before Generate reply. Closing it makes no request. No feature
+sends a message, pastes a result, or replaces text in another app.
+
+Result cards offer Regenerate, Shorter, Longer, Friendlier and More Direct.
+Regenerate reuses the original request; adjustments include the latest successful
+result. Source, Profile, language, provider and model remain the captured values
+for that result, even if settings change. Failed adjustments retain the prior
+result. Closing cancels and clears the result context; no history is persisted.
+
+Each provider has its own model, output-token limit and secure key. Provider
+switching clears unsaved key input and saves/loads local configuration only.
+OpenAI-compatible requires an HTTPS **base URL** such as `https://host/v1`;
+`/responses` is appended. Chat Completions-only servers are unsupported.
+Test provider explicitly asks about API charges and sends synthetic text only.
+Original OpenAI key storage remains compatible; the old model setting migrates
+once without replacing an existing new setting.
+
+See [provider compatibility](docs/m4-provider-compatibility.md),
+[M4 specification](docs/M4_SPEC.md), and [M4 verification](docs/m4-completion.md).
+The sections above describe the preserved M1–M3 backend behavior.
 
 ## Tray and diagnostics
 
@@ -204,10 +238,11 @@ items. CI is not a substitute for a GNOME desktop and a live API account.
 
 ## Privacy and documentation
 
-No selected text, generated content, profile data or API keys are logged or
-persisted by the application. Requests use HTTPS, do not follow redirects and set
-`store: false`. OpenAI's own data policies still apply. M0 never sends messages,
-scrapes apps, records clipboard history or monitors input.
+Selected text and results have no persistent app history. API keys use the OS
+keyring; Profile is saved locally as plain text only after Save. Neither is logged.
+Requests use HTTPS without redirects. OpenAI and Gemini use `store: false`;
+each provider's data policies apply. The app never sends messages, scrapes apps,
+records clipboard history or monitors general input.
 
 - [Architecture](docs/architecture.md)
 - [Privacy](docs/privacy.md)

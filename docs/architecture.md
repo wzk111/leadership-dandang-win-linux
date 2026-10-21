@@ -1,5 +1,47 @@
 # Architecture
 
+## Current M4 product layer (0.5.0)
+
+The sections below preserve the M0–M3 backend design history. M4 extends the
+shared product layer without replacing selection, window-policy, shortcut or
+IPC implementations.
+
+FeatureRegistry owns six stable IDs, display metadata, profile applicability,
+composer requirements and variants. FeaturePreferences persists enabled/quick
+IDs, removes unknown/duplicate entries and keeps 3–5 quick actions where possible.
+Workspace/manual views use a grid; the nonactivating ActionBar shows quick
+actions and More, which transfers the same value snapshot to the manual palette.
+
+Profile is a bounded seven-field value stored explicitly in local QSettings.
+It is plain text, not encrypted. Inclusion defaults OFF and applies only to
+Reply, Relevance and Add Insight. ReplyComposer owns a copied Selection, stance
+and optional intent. Opening it performs no secret read or AI request.
+
+AppController creates a GenerationContext at explicit generation: original
+PromptRequest, provider/model/language/token/base URL settings and latest successful
+result. It contains no key, is memory-only, and is cleared on result close.
+Regenerate reuses original input; adjustments include the latest successful
+result. Both use captured settings/Profile and never reread selection. Failures
+preserve the old result; close suppresses late completion and restores UI controls.
+
+AIService selects an adapter from the request's provider ID and allows one active
+request. OpenAI retains its established Responses transport/parser. The other
+adapters share HttpAIProvider; compatible Responses reuses the OpenAI parser.
+Every network path is asynchronous, bounded, cancelable and refuses redirects.
+Credentials are resolved immediately before sending, excluded from context, and
+released from the controller's pending request after dispatch.
+
+CredentialService adopts independent provider stores and locks the provider for
+each asynchronous operation. LinuxSecretStore retains its worker-thread libsecret
+backend. The original schema/account=openai is unchanged; other providers use
+separate accounts. Settings switching persists local configuration only and never
+loads a key. A confirmed synthetic test contains no selection or Profile.
+
+Settings tabs are General / AI Providers / Features, with a separate Profile
+window. ApplicationProduct connects preferences, local previews, metadata and
+busy controls. Diagnostics contain no content; they expose counts and status only.
+See [privacy](privacy.md) and [provider contracts](m4-provider-compatibility.md).
+
 ```mermaid
 flowchart TD
   Clipboard[Explicit Process Clipboard] --> Selection[ISelectionProvider]
