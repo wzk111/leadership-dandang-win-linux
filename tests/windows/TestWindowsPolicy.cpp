@@ -11,6 +11,16 @@ using namespace ws;
 class TestWindowsPolicy : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase() {
+        // QTEST_MAIN has initialized QApplication; no test QWidget exists yet.
+        if(QGuiApplication::platformName()!="windows")QSKIP("DPI awareness verification requires native Qt Windows platform.");
+        const auto context=GetThreadDpiAwarenessContext();
+        QVERIFY2(context,"Windows did not return a thread DPI awareness context.");
+        const auto awareness=GetAwarenessFromDpiAwarenessContext(context);
+        const bool perMonitorV2=AreDpiAwarenessContextsEqual(context,DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        qInfo("Qt startup DPI awareness: %d; per-monitor V2: %s",int(awareness),perMonitorV2?"yes":"no");
+        QCOMPARE(int(awareness),int(DPI_AWARENESS_PER_MONITOR_AWARE));
+    }
     void scales_data() {
         QTest::addColumn<double>("scale");
         for(double scale:{1.0,1.25,1.5,2.0})QTest::newRow(qPrintable(QString::number(scale)))<<scale;
@@ -82,7 +92,33 @@ private slots:
         for(int stage=0;stage<4;++stage) {
             if(stage==1 || stage==3) {
                 QVERIFY(snapshot.anchorRect);
-                const auto placement=policy.positionActionBar(bar,*snapshot.anchorRect);QVERIFY(placement);
+                const auto placement=policy.positionActionBar(bar,*snapshot.anchorRect);
+                if(!placement) {
+                    const auto anchor=*snapshot.anchorRect;
+                    qInfo()<<"Placement failed at stage"<<stage<<"physical anchor"<<anchor
+                           <<"bar size"<<bar.size()<<"Qt platform"<<QGuiApplication::platformName()
+                           <<"last Win32 error"<<GetLastError();
+                    RECT rectangle{anchor.x(),anchor.y(),LONG(qint64(anchor.x())+anchor.width()),LONG(qint64(anchor.y())+anchor.height())};
+                    const auto monitor=MonitorFromRect(&rectangle,MONITOR_DEFAULTTONEAREST);
+                    MONITORINFOEXW info{};info.cbSize=sizeof(info);
+                    const bool monitorInfo=monitor && GetMonitorInfoW(monitor,reinterpret_cast<MONITORINFO*>(&info));
+                    qInfo()<<"MonitorFromRect handle"<<quintptr(monitor)<<"GetMonitorInfo success"<<monitorInfo
+                           <<"last Win32 error"<<GetLastError();
+                    const auto device=monitorInfo?QString::fromWCharArray(info.szDevice):QString();
+                    const QRect physical(info.rcMonitor.left,info.rcMonitor.top,info.rcMonitor.right-info.rcMonitor.left,info.rcMonitor.bottom-info.rcMonitor.top);
+                    qInfo()<<"Native monitor device"<<device<<"physical geometry"<<physical;
+                    for(auto* screen:QGuiApplication::screens()) {
+                        const bool matched=monitorInfo && screen->name().compare(device,Qt::CaseInsensitive)==0;
+                        qInfo()<<"Qt screen"<<screen->name()<<"geometry"<<screen->geometry()
+                               <<"available"<<screen->availableGeometry()<<"DPR"<<screen->devicePixelRatio()<<"device matched"<<matched;
+                        if(matched) {
+                            const auto mapped=WindowsWindowPolicy::physicalToLogical(anchor,physical,screen->geometry(),screen->devicePixelRatio());
+                            qInfo()<<"Mapped anchor valid"<<bool(mapped)<<"logical anchor"<<mapped.value_or(QRect());
+                            if(mapped)qInfo()<<"Pure placement available"<<bool(placeActionBar(*mapped,bar.size(),screen->availableGeometry()));
+                        }
+                    }
+                }
+                QVERIFY2(placement,"Native toolbar placement failed; see physical monitor / Qt screen diagnostics above.");
                 bar.showForSelection(snapshot,placement->geometry.topLeft());QTest::qWait(100);
                 QCOMPARE(GetForegroundWindow(),source);
             }

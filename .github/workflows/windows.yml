@@ -21,7 +21,11 @@ jobs:
       - name: Build Release
         run: cmake --build build --parallel 2
       - name: Shared and native tests
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          ctest --test-dir build --output-on-failure
+          $testExit = $LASTEXITCODE
+          Get-ChildItem build/test-results/*.txt | ForEach-Object { Get-Content $_.FullName }
+          exit $testExit
       - name: Launch smoke
         run: |
           $process = Start-Process -FilePath .\build\worksidekick.exe -ArgumentList '--smoke-test' -PassThru -Wait -WindowStyle Hidden
@@ -39,3 +43,4 @@ jobs:
           path: |
             build/portable/
             build/Testing/Temporary/LastTest.log
+            build/test-results/

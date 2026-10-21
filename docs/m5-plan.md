@@ -35,3 +35,21 @@ Windows instance transport uses current-user-secured QLocalServer named pipes, p
 6. M5.6 Full Windows and Ubuntu regression, local native validation where available, separate real-app matrix, privacy/resource review, docs and exact SHA/CI evidence.
 
 Each phase has tests or specified native checks before implementation. No empty-adapter milestone PASS. Native desktop evidence may force PARTIAL when unavailable. All real-app and performance results remain NOT TESTED until measured.
+
+## Execution evidence
+
+- Foundation `fbcc7a9`: Windows `39613122678` and Ubuntu `39613122698` both SUCCESS.
+- Async entry RED `88b2c40`: Windows and Ubuntu failed the new AsyncManual tests
+  because the old entry called resolve synchronously and registered no completion.
+  The application was then changed to use generation/QPointer-guarded callbacks.
+- Native test cases were specified/written before their corresponding adapters.
+  First full MSVC build exposed the UIA/Qt header order; it was corrected along
+  with explicit AUTOMOC inclusion of InstanceCoordinator.h. No Linux adapter or
+  Ubuntu workflow source was changed.
+- Independent reviews covered COM/resource lifetime, protected selection, callback
+  reentrancy, shortcut ID ownership, named-pipe ACLs and deadline handling. Findings
+  corrected: application-range hotkey ID, foreground-change silent discard,
+  incomplete-type constructor boundary, completed-signal deletion guard and
+  nonnegative IPC remaining timeout. Tests cover the relevant regressions.
+- Final evidence, exact implementation SHA and any desktop skips belong in
+  [m5-completion.md](m5-completion.md), not inferred from this plan.

@@ -63,7 +63,9 @@ bool InstanceCoordinator::prepareDirectory() {
     directory_=QDir::cleanPath(QFileInfo(directory_).absoluteFilePath());
     if(!QDir().mkpath(QFileInfo(directory_).absolutePath())){error_="Cannot create local IPC parent directory.";return false;}
     // Protected ACL grants access only to this user's SID, with inheritance for lock files.
-    const auto sddl=("D:P(A;OICI;FA;;;"+sid+")").toStdWString();PSECURITY_DESCRIPTOR descriptor=nullptr;
+    // Elevated tokens can default the owner to Administrators. Explicitly retain
+    // the actual user as owner so the same user passes our ownership check.
+    const auto sddl=("O:"+sid+"D:P(A;OICI;FA;;;"+sid+")").toStdWString();PSECURITY_DESCRIPTOR descriptor=nullptr;
     if(!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(),SDDL_REVISION_1,&descriptor,nullptr)){error_="Cannot create private IPC security descriptor.";return false;}
     SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES),descriptor,FALSE};
     const auto path=QDir::toNativeSeparators(directory_).toStdWString();

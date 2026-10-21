@@ -30,12 +30,18 @@ class TestWindowsInstance:public QObject {
 private slots:
  void nativeAclsAndBoundedProtocol() {
     QTemporaryDir dir;const auto path=dir.filePath("ipc");InstanceCoordinator instance(path);
-    QCOMPARE(instance.start(false),InstanceCoordinator::Result::Primary);
+    QVERIFY2(instance.start(false)==InstanceCoordinator::Result::Primary,qPrintable(instance.error()));
     const auto folder=QDir::toNativeSeparators(path).toStdWString();
     HANDLE h=CreateFileW(folder.c_str(),READ_CONTROL,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,nullptr);
     QVERIFY(h!=INVALID_HANDLE_VALUE);const bool secureFolder=privateAcl(h);CloseHandle(h);QVERIFY(secureFolder);
+    // QLocalSocket's I/O handle need not request READ_CONTROL. Open a native
+    // handle with that explicit right to inspect the actual named-pipe DACL.
+    const auto pipe=(QStringLiteral("\\\\.\\pipe\\")+instance.endpoint()).toStdWString();
+    HANDLE security=CreateFileW(pipe.c_str(),READ_CONTROL|GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+    QVERIFY2(security!=INVALID_HANDLE_VALUE,qPrintable(QString("Open pipe security handle failed: %1").arg(GetLastError())));
+    const bool securePipe=privateAcl(security);CloseHandle(security);QVERIFY(securePipe);
+    QCoreApplication::processEvents();
     QLocalSocket client;client.connectToServer(instance.endpoint());QVERIFY(client.waitForConnected());
-    QVERIFY(privateAcl(reinterpret_cast<HANDLE>(client.socketDescriptor())));
     QSignalSpy triggers(&instance,&InstanceCoordinator::triggerRequested);
     client.write("trigger secret-invalid\n");client.flush();QTRY_COMPARE(client.state(),QLocalSocket::UnconnectedState);QCOMPARE(triggers.size(),0);
     QLocalSocket valid;valid.connectToServer(instance.endpoint());QVERIFY(valid.waitForConnected());valid.write("trigger\n");valid.flush();
@@ -51,7 +57,8 @@ private slots:
     QProcess client;client.start(exe,{"--peer",path,"--trigger"});QVERIFY(client.waitForFinished(5000));QCOMPARE(client.exitCode(),0);
     QTRY_VERIFY(([&]{ao+=a.readAllStandardOutput();bo+=b.readAllStandardOutput();return (ao+bo).contains("trigger");})());
     client.start(exe,{"--peer",path});QVERIFY(client.waitForFinished(5000));QCOMPARE(client.exitCode(),0);
-    owner->kill();QVERIFY(owner->waitForFinished());InstanceCoordinator recovery(path);QCOMPARE(recovery.start(false),InstanceCoordinator::Result::Primary);
+    owner->kill();QVERIFY(owner->waitForFinished());InstanceCoordinator recovery(path);
+    QVERIFY2(recovery.start(false)==InstanceCoordinator::Result::Primary,qPrintable(recovery.error()));
  }
 };
 int main(int argc,char** argv) {
@@ -60,7 +67,7 @@ int main(int argc,char** argv) {
     if(args.size()>2 && args[1]=="--peer") {
         InstanceCoordinator instance(args[2]);const auto result=instance.start(args.contains("--trigger"));
         if(result==InstanceCoordinator::Result::Forwarded)return 0;
-        if(result!=InstanceCoordinator::Result::Primary)return 2;
+        if(result!=InstanceCoordinator::Result::Primary){QTextStream(stderr)<<instance.error()<<Qt::endl;return 2;}
         QTextStream(stdout)<<"primary\n"<<Qt::flush;
         QObject::connect(&instance,&InstanceCoordinator::triggerRequested,&app,[]{QTextStream(stdout)<<"trigger\n"<<Qt::flush;});
         QObject::connect(&instance,&InstanceCoordinator::openRequested,&app,[]{QTextStream(stdout)<<"open\n"<<Qt::flush;});

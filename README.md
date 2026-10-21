@@ -1,6 +1,7 @@
 # WorkSidekick
 
-A C++20 / Qt 6 desktop assistant for explicitly chosen text. M5 (0.6.0) brings the Windows native backend to the existing
+A C++20 / Qt 6 desktop assistant for explicitly chosen text. M5 (0.6.0) adds a
+Windows native backend while retaining the six shared features:
 **Plain Speak, Summarize, Polish, Reply, Relevance and Add Insight**, an optional
 local Profile, result refinements, and four provider choices. Review results and
 copy them yourself. Selecting text never sends an AI request.
