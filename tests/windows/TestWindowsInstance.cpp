@@ -6,21 +6,31 @@
 #include <QDir>
 #include <windows.h>
 #include <aclapi.h>
+#include <sddl.h>
 #include "app/InstanceCoordinator.h"
 using namespace ws;
 static bool privateAcl(HANDLE handle) {
     PACL acl=nullptr;PSECURITY_DESCRIPTOR descriptor=nullptr;
-    if(GetSecurityInfo(handle,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&acl,nullptr,&descriptor)!=ERROR_SUCCESS)return false;
+    const DWORD securityError=GetSecurityInfo(handle,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&acl,nullptr,&descriptor);
+    if(securityError!=ERROR_SUCCESS){qWarning("ACL inspection GetSecurityInfo error=%lu",securityError);return false;}
     bool good=acl && acl->AceCount>0;
+    if(!good)qWarning("ACL inspection missing/empty DACL");
     HANDLE token=nullptr;DWORD size=0;QByteArray user;
     if(OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token)) {GetTokenInformation(token,TokenUser,nullptr,0,&size);user.resize(size);if(!GetTokenInformation(token,TokenUser,user.data(),size,&size))user.clear();CloseHandle(token);}
-    if(user.isEmpty())good=false;
-    for(DWORD i=0;good && i<acl->AceCount;++i) {
-        void* raw=nullptr;if(!GetAce(acl,i,&raw)){good=false;break;}
+    if(user.isEmpty()){qWarning("ACL inspection current-user lookup failed");good=false;}
+    for(DWORD i=0;acl && i<acl->AceCount;++i) {
+        void* raw=nullptr;if(!GetAce(acl,i,&raw)){qWarning("ACL inspection GetAce error=%lu",GetLastError());good=false;break;}
         auto* header=static_cast<ACE_HEADER*>(raw);
+        qInfo("ACL ACE index=%lu type=%u flags=%u",i,unsigned(header->AceType),unsigned(header->AceFlags));
         if(header->AceType==ACCESS_ALLOWED_ACE_TYPE) {
             auto* ace=static_cast<ACCESS_ALLOWED_ACE*>(raw);
-            good=EqualSid(&ace->SidStart,reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid);
+            const bool same=!user.isEmpty() && EqualSid(&ace->SidStart,reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid);
+            LPWSTR sid=nullptr;
+            if(ConvertSidToStringSidW(&ace->SidStart,&sid)) {
+                qInfo().noquote()<<QString("ACL allow SID=%1 mask=0x%2 currentUser=%3").arg(QString::fromWCharArray(sid)).arg(ace->Mask,0,16).arg(same);
+                LocalFree(sid);
+            }
+            good=good && same;
         }
     }
     LocalFree(descriptor);return good;
