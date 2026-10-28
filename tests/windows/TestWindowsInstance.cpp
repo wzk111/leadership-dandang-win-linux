@@ -64,9 +64,9 @@ private slots:
     QByteArray ao,bo;
     QTRY_VERIFY_WITH_TIMEOUT(([&]{ao+=a.readAllStandardOutput();bo+=b.readAllStandardOutput();return (ao.contains("primary") || bo.contains("primary")) && (a.state()==QProcess::NotRunning || b.state()==QProcess::NotRunning);})(),6000);
     QCOMPARE(ao.count("primary")+bo.count("primary"),1);auto* owner=ao.contains("primary")?&a:&b;
-    QProcess client;client.start(exe,{"--peer",path,"--trigger"});QVERIFY(client.waitForFinished(5000));QCOMPARE(client.exitCode(),0);
+    QProcess client;client.start(exe,{"--peer",path,"--trigger"});QVERIFY(client.waitForFinished(5000));QVERIFY2(client.exitCode()==0,client.readAllStandardError().constData());
     QTRY_VERIFY(([&]{ao+=a.readAllStandardOutput();bo+=b.readAllStandardOutput();return (ao+bo).contains("trigger");})());
-    client.start(exe,{"--peer",path});QVERIFY(client.waitForFinished(5000));QCOMPARE(client.exitCode(),0);
+    client.start(exe,{"--peer",path});QVERIFY(client.waitForFinished(5000));QVERIFY2(client.exitCode()==0,client.readAllStandardError().constData());
     owner->kill();QVERIFY(owner->waitForFinished());InstanceCoordinator recovery(path);
     QVERIFY2(recovery.start(false)==InstanceCoordinator::Result::Primary,qPrintable(recovery.error()));
  }

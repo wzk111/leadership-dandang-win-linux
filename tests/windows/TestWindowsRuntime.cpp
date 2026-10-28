@@ -3,6 +3,8 @@
 #include <QProcess>
 #include <QFile>
 #include <QElapsedTimer>
+#include <QtConcurrent/QtConcurrentRun>
+#include <array>
 #include "platform/windows/WindowsSelectionMonitor.h"
 #include "platform/windows/WindowsGlobalShortcut.h"
 #include "platform/windows/UIAQuery.h"
@@ -10,6 +12,15 @@
 #include "WindowsFixture.h"
 using namespace ws;
 namespace {
+struct InjectionResult {UINT sent; qint64 elapsedMs;};
+template<size_t N> auto injectNativeInput(std::array<INPUT,N> input){
+    // WH_MOUSE_LL is serviced on the Qt thread. Keep that message pump running
+    // while SendInput waits for hook delivery; the worker owns its INPUT copy.
+    return QtConcurrent::run([input]()mutable{
+        QElapsedTimer timer;timer.start();const auto sent=SendInput(UINT(N),input.data(),sizeof(INPUT));
+        return InjectionResult{sent,timer.elapsed()};
+    });
+}
 class RecordingMonitor final:public WindowsSelectionMonitor {
 public:
     explicit RecordingMonitor(quintptr fixture):fixture_(fixture){clock_.start();}
@@ -104,10 +115,16 @@ private slots:
     QVERIFY2(monitor.start(),qPrintable(monitor.status().description));QVERIFY(monitor.status().running);
     QCOMPARE(selected.size(),0);QVERIFY(SetCursorPos(point.x,point.y));
     QCOMPARE(GetForegroundWindow(),source);QCOMPARE(GetAncestor(WindowFromPoint(point),GA_ROOT),source);
-    INPUT mouse[4]{};
+    std::array<INPUT,4> mouse{};
     for(int i=0;i<4;++i){mouse[i].type=INPUT_MOUSE;mouse[i].mi.dwFlags=i%2?MOUSEEVENTF_LEFTUP:MOUSEEVENTF_LEFTDOWN;}
-    inputs.mousePending=true;const auto mouseSent=SendInput(4,mouse,sizeof(INPUT));if(mouseSent==4)inputs.mousePending=false;
-    QCOMPARE(mouseSent,UINT(4));
+    inputs.mousePending=true;auto mouseInjection=injectNativeInput(mouse);
+    QElapsedTimer mouseWait;mouseWait.start();
+    while(!mouseInjection.isFinished() && mouseWait.elapsed()<5000)QTest::qWait(10);
+    qInfo()<<"Mouse injection worker: finished="<<mouseInjection.isFinished()<<"pumpWaitMs="<<mouseWait.elapsed();
+    QVERIFY2(mouseInjection.isFinished(),"Native mouse injection exceeded 5000 ms while the Qt thread continued pumping messages.");
+    const auto mouseResult=mouseInjection.result();if(mouseResult.sent==4)inputs.mousePending=false;
+    qInfo()<<"Mouse injection sent="<<mouseResult.sent<<"injectElapsedMs="<<mouseResult.elapsedMs;
+    QCOMPARE(mouseResult.sent,UINT(4));
     QElapsedTimer detectionWait;detectionWait.start();
     while(selected.isEmpty() && detectionWait.elapsed()<6000)QTest::qWait(20);
     const auto detectedWithinDeadline=selected.size();
@@ -140,11 +157,16 @@ private slots:
 
     WindowsGlobalShortcut shortcut;QSignalSpy activated(&shortcut,&IGlobalShortcut::activated);
     shortcut.start(true);QVERIFY2(shortcut.status().registered,qPrintable(shortcut.status().description));
-    INPUT keyboard[6]{};const WORD keys[]{VK_CONTROL,VK_MENU,'P','P',VK_MENU,VK_CONTROL};
+    std::array<INPUT,6> keyboard{};const WORD keys[]{VK_CONTROL,VK_MENU,'P','P',VK_MENU,VK_CONTROL};
     for(int i=0;i<6;++i){keyboard[i].type=INPUT_KEYBOARD;keyboard[i].ki.wVk=keys[i];if(i>=3)keyboard[i].ki.dwFlags=KEYEVENTF_KEYUP;}
     QCOMPARE(GetForegroundWindow(),source);inputs.keysPending=true;
-    const auto keysSent=SendInput(6,keyboard,sizeof(INPUT));if(keysSent==6)inputs.keysPending=false;
-    QCOMPARE(keysSent,UINT(6));QTRY_COMPARE_WITH_TIMEOUT(activated.size(),1,3000);
+    auto keyInjection=injectNativeInput(keyboard);QElapsedTimer keyWait;keyWait.start();
+    while(!keyInjection.isFinished() && keyWait.elapsed()<5000)QTest::qWait(10);
+    qInfo()<<"Key injection worker: finished="<<keyInjection.isFinished()<<"pumpWaitMs="<<keyWait.elapsed();
+    QVERIFY2(keyInjection.isFinished(),"Native key injection exceeded 5000 ms while the Qt thread continued pumping messages.");
+    const auto keyResult=keyInjection.result();if(keyResult.sent==6)inputs.keysPending=false;
+    qInfo()<<"Key injection sent="<<keyResult.sent<<"injectElapsedMs="<<keyResult.elapsedMs;
+    QCOMPARE(keyResult.sent,UINT(6));QTRY_COMPARE_WITH_TIMEOUT(activated.size(),1,3000);
     QVERIFY(shortcut.status().lastActivation.isValid());QCOMPARE(GetForegroundWindow(),source);
     QVERIFY(query.request(quintptr(handle)));QTRY_COMPARE_WITH_TIMEOUT(queried.size(),1,6000);
     const auto after=qvariant_cast<UIAQueryResult>(queried.takeFirst()[0]);
