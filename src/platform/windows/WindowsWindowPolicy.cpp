@@ -1,7 +1,6 @@
 #include "WindowsWindowPolicy.h"
 #include <QGuiApplication>
 #include <QScreen>
-#include <QWindowsScreen>
 #include <QEvent>
 #include <windows.h>
 #include <cmath>

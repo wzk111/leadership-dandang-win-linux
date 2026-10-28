@@ -1,7 +1,6 @@
 #include <QtTest>
 #include <QPushButton>
 #include <QScreen>
-#include <QWindowsScreen>
 #include <QProcess>
 #include <QFile>
 #include "platform/windows/WindowsWindowPolicy.h"
