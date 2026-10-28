@@ -41,9 +41,11 @@ QPointer and a request generation. Only an explicit feature action invokes AI.
 ## Coordinates and focus
 
 UIA returns physical screen rectangles; the last meaningful range rectangle is
-used. WindowsWindowPolicy matches MONITORINFOEX device names to QScreen, scales
+used. WindowsWindowPolicy matches native HMONITOR handles through QWindowsScreen
+(Qt 6.7+, validated with Qt 6.8.3), scales
 screen-local offsets by DPR and retains Qt's virtual screen origin. It does not
-divide global coordinates by a scale. The shared placement function clamps to
+divide global coordinates by a scale. QScreen friendly names are not device IDs.
+The shared placement function clamps to
 available screen geometry. Qt initializes application DPI awareness before the
 first window; only the separate windowless helper sets its own DPI awareness.
 

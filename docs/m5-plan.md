@@ -53,3 +53,15 @@ Each phase has tests or specified native checks before implementation. No empty-
   nonnegative IPC remaining timeout. Tests cover the relevant regressions.
 - Final evidence, exact implementation SHA and any desktop skips belong in
   [m5-completion.md](m5-completion.md), not inferred from this plan.
+- On resumption, native diagnostics confirmed that Qt screen friendly names do
+  not identify Win32 display devices. Matching native HMONITOR identities fixes
+  actual two-monitor placement while preserving screen-local DPI conversion.
+- Pipe ACL inspection with SE_FILE_OBJECT returned error 87; SE_KERNEL_OBJECT
+  verified the actual current-user-only DACL. Production permissions were not
+  relaxed. Fast owner close later exposed waitForBytesWritten(false) before ACK
+  validation; forwarding now treats a bounded exact acknowledgment as authoritative.
+- Synchronous SendInput on the hook-owning test thread delayed delivery about
+  1 second and lost the initial down. Worker-thread input with the Qt event loop
+  pumping restored native double-click detection and real Ctrl+Alt+P activation.
+  Native source focus and unchanged selection across toolbar show/hide/click
+  were measured separately. All input injection stays inside opt-in tests.

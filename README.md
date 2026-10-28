@@ -264,6 +264,11 @@ Smoke mode opens the windows using synthetic data, sends nothing and exits.
 
 [Ubuntu CI](https://github.com/wzk111/leadership-dandang-win-linux/actions/workflows/ubuntu.yml)
 builds with Ubuntu's system CMake and Qt 6.2, then runs these checks.
+[Windows CI](https://github.com/wzk111/leadership-dandang-win-linux/actions/workflows/windows.yml)
+uses Windows Server 2022, MSVC x64 and pinned Qt 6.8.3. It builds the application,
+UIA helper and shared/native tests, runs a launch smoke, and publishes validation
+binaries. Opt-in desktop tests require separate native evidence; see
+[M5 verification](docs/m5-completion.md).
 See [M3 verification](docs/m3-completion.md), [M2 verification](docs/m2-completion.md), [M1 verification](docs/m1-completion.md) and [M0 verification](docs/m0-completion.md) for evidence and **NOT TESTED**
 items. CI is not a substitute for a GNOME desktop and a live API account.
 
@@ -279,7 +284,10 @@ records clipboard history or monitors general input.
 - [Privacy](docs/privacy.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Linux compatibility](docs/linux-selection-compatibility.md)
-- [Windows compatibility](docs/windows-selection-compatibility.md)
+- [Windows compatibility](docs/m5-windows-compatibility.md)
+- [M5 specification](docs/M5_SPEC.md)
+- [M5 implementation plan](docs/m5-plan.md)
+- [M5 verification](docs/m5-completion.md)
 - [M3 specification](docs/M3_SPEC.md)
 - [M3 implementation plan](docs/m3-plan.md)
 

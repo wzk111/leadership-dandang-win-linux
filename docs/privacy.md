@@ -2,6 +2,10 @@
 
 ## Windows native boundaries
 
+Opt-in native integration tests can inject input only into verified synthetic
+fixtures and their test toolbar, restoring the cursor and cleaning up afterward.
+Production selection detection never injects input or simulates a clipboard copy.
+
 Windows observes only left-button gesture metadata through WH_MOUSE_LL and
 foreground-window changes to request selected TextPattern ranges. It installs no
 keyboard hook and reads no arbitrary control/document text. Password controls and
