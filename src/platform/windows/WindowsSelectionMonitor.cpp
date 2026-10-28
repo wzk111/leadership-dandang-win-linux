@@ -122,7 +122,12 @@ void WindowsSelectionMonitor::requestSelection() {
         if(!status_.running || generation!=generation_ || target_!=target || foregroundWindow()!=target)return;
         disconnect(completion_);completion_={};status_.initialized=result.initialized;
         const bool valid=result.initialized && result.selection && !result.selection->text.trimmed().isEmpty() && result.selection->text.size()<=100000;
-        if(!valid){invalidate(result.initialized?"No supported nonempty selection":"UI Automation initialization unavailable");return;}
+        if(!valid){
+            // UIAQuery emits fixed diagnostics or whitelist-validated worker reasons,
+            // never source text or raw helper output.
+            invalidate(result.reason.isEmpty()?(result.initialized?"No supported nonempty selection":"UI Automation initialization unavailable"):result.reason);
+            return;
+        }
         latest_=result.selection;status_.lastResult="Selected text available locally";
         expiry_.start();const auto snapshot=*latest_;emit selectionDetected(snapshot);emit statusChanged();
     });

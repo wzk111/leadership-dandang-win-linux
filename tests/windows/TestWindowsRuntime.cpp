@@ -2,6 +2,7 @@
 #include <QGuiApplication>
 #include <QProcess>
 #include <QFile>
+#include <QElapsedTimer>
 #include "platform/windows/WindowsSelectionMonitor.h"
 #include "platform/windows/WindowsGlobalShortcut.h"
 #include "platform/windows/UIAQuery.h"
@@ -74,7 +75,30 @@ private slots:
     INPUT mouse[4]{};
     for(int i=0;i<4;++i){mouse[i].type=INPUT_MOUSE;mouse[i].mi.dwFlags=i%2?MOUSEEVENTF_LEFTUP:MOUSEEVENTF_LEFTDOWN;}
     inputs.mousePending=true;const auto mouseSent=SendInput(4,mouse,sizeof(INPUT));if(mouseSent==4)inputs.mousePending=false;
-    QCOMPARE(mouseSent,UINT(4));QTRY_COMPARE_WITH_TIMEOUT(selected.size(),1,6000);
+    QCOMPARE(mouseSent,UINT(4));
+    QElapsedTimer detectionWait;detectionWait.start();
+    while(selected.isEmpty() && detectionWait.elapsed()<6000)QTest::qWait(20);
+    const auto detectedWithinDeadline=selected.size();
+    const auto monitorState=monitor.status();const auto latest=monitor.latestSelection();
+    qInfo()<<"Native monitor diagnostic: elapsedMs="<<detectionWait.elapsed()<<"detected="<<selected.size()
+        <<"events="<<monitorState.events<<"initialized="<<monitorState.initialized
+        <<"running="<<monitorState.running<<"lastResult="<<monitorState.lastResult<<"description="<<monitorState.description
+        <<"foreground="<<reinterpret_cast<quintptr>(GetForegroundWindow())<<"fixture="<<quintptr(handle)
+        <<"latestChars="<<(latest?latest->text.size():0)<<"latestAnchor="<<bool(latest && latest->anchorRect);
+    if(selected.isEmpty()){
+        // Probe only the same synthetic fixture, separating native selection from hook delivery.
+        QVERIFY(query.request(quintptr(handle)));QElapsedTimer probeWait;probeWait.start();
+        while(queried.isEmpty() && probeWait.elapsed()<6000)QTest::qWait(20);
+        if(!queried.isEmpty()){
+            const auto probe=qvariant_cast<UIAQueryResult>(queried.takeFirst()[0]);
+            const bool knownSynthetic=probe.selection && !probe.selection->text.isEmpty() && initial.selection->text.contains(probe.selection->text);
+            qInfo()<<"Post-doubleclick UIA: initialized="<<probe.initialized<<"reason="<<probe.reason
+                <<"chars="<<(probe.selection?probe.selection->text.size():0)<<"anchor="<<bool(probe.selection && probe.selection->anchorRect)
+                <<"isSyntheticWord="<<bool(probe.selection && probe.selection->text.trimmed()=="synthetic")
+                <<"fixtureText="<<(knownSynthetic?probe.selection->text:QString("[not fixture text or unavailable]"));
+        }else qInfo()<<"Post-doubleclick UIA: no completion within 6000 ms";
+    }
+    QCOMPARE(detectedWithinDeadline,1);
     const auto snapshot=qvariant_cast<Selection>(selected[0][0]);
     QCOMPARE(snapshot.text.trimmed(),QString("synthetic"));QVERIFY(initial.selection->text.contains(snapshot.text));
     QVERIFY(snapshot.anchorRect);QVERIFY(snapshot.anchorRect->isValid());QVERIFY(!snapshot.sourceApplication.isEmpty());

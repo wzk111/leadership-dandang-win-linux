@@ -19,7 +19,7 @@ jobs:
       - name: Configure Release
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build Release
-        run: cmake --build build --parallel 2
+        run: cmake --build build --parallel 4
       - name: Shared and native tests
         run: |
           ctest --test-dir build --output-on-failure
