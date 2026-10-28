@@ -7,6 +7,7 @@
 #include "platform/windows/UIAQuery.h"
 #include "ui/ActionBar.h"
 #include <windows.h>
+#include "WindowsFixture.h"
 using namespace ws;
 class TestWindowsPolicy : public QObject {
     Q_OBJECT
@@ -93,8 +94,8 @@ private slots:
         AllowSetForegroundWindow(DWORD(fixture.processId()));
         DWORD_PTR ignored=0;
         QVERIFY(SendMessageTimeoutW(source,WM_APP+1,0,0,SMTO_ABORTIFHUNG,2000,&ignored));
-        SetForegroundWindow(source);QTest::qWait(150);
-        if(GetForegroundWindow()!=source)QSKIP("OS denied synthetic fixture foreground activation; native focus NOT TESTED.");
+        QString activationReason;
+        if(!ws::test::prepareFixtureForeground(source,sourcePid,activationReason))QSKIP(qPrintable(activationReason));
 
         WindowsWindowPolicy policy;ActionBar bar;QVERIFY(policy.configureActionBar(bar));
         QSignalSpy chosen(&bar,&ActionBar::featureChosen);

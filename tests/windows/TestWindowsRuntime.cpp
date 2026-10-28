@@ -7,6 +7,7 @@
 #include "platform/windows/WindowsGlobalShortcut.h"
 #include "platform/windows/UIAQuery.h"
 #include <windows.h>
+#include "WindowsFixture.h"
 using namespace ws;
 namespace {
 struct FixtureCleanup {
@@ -55,8 +56,8 @@ private slots:
     QCOMPARE(sourcePid,DWORD(fixture.processId()));cleanup.window=source;
     AllowSetForegroundWindow(sourcePid);DWORD_PTR ignored=0;
     QVERIFY(SendMessageTimeoutW(source,WM_APP+1,0,0,SMTO_ABORTIFHUNG,2000,&ignored));
-    SetForegroundWindow(source);QTest::qWait(150);
-    if(GetForegroundWindow()!=source)QSKIP("Native runtime NOT TESTED: OS denied synthetic fixture foreground activation.");
+    QString activationReason;
+    if(!ws::test::prepareFixtureForeground(source,sourcePid,activationReason))QSKIP(qPrintable(activationReason));
     POINT previous{};QVERIFY(GetCursorPos(&previous));InputCleanup inputs{previous};
 
     UIAQuery query(nullptr,workerPath,5000);QSignalSpy queried(&query,&UIAQuery::completed);
