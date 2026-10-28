@@ -4,7 +4,7 @@ namespace ws {
 std::optional<BarPlacement> placeActionBar(const QRect& anchor, const QSize& size, const QRect& available) {
     if (!anchor.isValid() || size.isEmpty() || !available.isValid() ||
         size.width() > available.width() || size.height() > available.height()) return {};
-    // AT-SPI coordinates remain raw. No unverified DPI conversion.
+    // The platform adapter supplies placement coordinates; conversion belongs there.
     constexpr qint64 gap = 8;
     qint64 x = qint64(anchor.x()) + (qint64(anchor.width()) - size.width()) / 2;
     qint64 y = qint64(anchor.y()) - gap - size.height();

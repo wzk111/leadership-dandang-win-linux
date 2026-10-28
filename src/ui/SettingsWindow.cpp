@@ -49,7 +49,7 @@ SettingsWindow::SettingsWindow(QSettings& settings,ISecretStore& secrets,QWidget
     form->addRow("Provider",provider_);form->addRow("Model",model_);form->addRow("Compatible endpoint",baseUrl_);form->addRow("Maximum output tokens",maxOutputTokens_);form->addRow("API key",key_);aiLayout->addLayout(form);
     auto* keyRow=new QHBoxLayout;saveKey_=new QPushButton("Save API key securely",ai);saveKey_->setObjectName("saveKey");
     removeKey_=new QPushButton("Delete saved key",ai);removeKey_->setObjectName("deleteKey");keyRow->addWidget(saveKey_);keyRow->addWidget(removeKey_);aiLayout->addLayout(keyRow);
-    auto* info=new QLabel("Keys are stored in your OS keyring, never in settings. Each provider has a separate key.\nSwitching providers makes no AI request and does not read a key.",ai);info->setWordWrap(true);aiLayout->addWidget(info);
+    auto* info=new QLabel("Keys are stored in your OS secure credential storage, never in settings. Each provider has a separate key.\nSwitching providers makes no AI request and does not read a key.",ai);info->setWordWrap(true);aiLayout->addWidget(info);
     testProvider_=new QPushButton("Test provider",ai);testProvider_->setObjectName("testProvider");aiLayout->addWidget(testProvider_);aiLayout->addStretch();tabs->addTab(ai,"AI Providers");
     auto* features=new QWidget(tabs);auto* featureLayout=new QVBoxLayout(features);auto* grid=new QGridLayout;
     grid->addWidget(new QLabel("Feature",features),0,0);grid->addWidget(new QLabel("Enabled",features),0,1);grid->addWidget(new QLabel("Quick action",features),0,2);
@@ -78,16 +78,16 @@ SettingsWindow::SettingsWindow(QSettings& settings,ISecretStore& secrets,QWidget
     connect(saveKey_,&QPushButton::clicked,this,[this]{
         auto key=key_->text().trimmed();key_->clear();if(key.isEmpty()){status_->setText("Enter a key first.");return;}
         if(requestBusy_ || secrets_.busy() || !secrets_.selectProvider(providerId_)){status_->setText("Secret store is busy or unavailable. Try again.");return;}
-        keyOperation_=true;refreshControls();status_->setText("Saving to system keyring…");
-        if(!secrets_.save(key)){keyOperation_=false;refreshControls();status_->setText("Could not save key. Unlock your keyring and retry.");}
+        keyOperation_=true;refreshControls();status_->setText("Saving to secure credential storage…");
+        if(!secrets_.save(key)){keyOperation_=false;refreshControls();status_->setText("Could not save key. Check your OS credential storage and retry.");}
     });
     connect(removeKey_,&QPushButton::clicked,this,[this]{
         key_->clear();if(requestBusy_ || secrets_.busy() || !secrets_.selectProvider(providerId_)){status_->setText("Secret store is busy or unavailable. Try again.");return;}
         keyOperation_=true;refreshControls();status_->setText("Removing saved key…");
-        if(!secrets_.remove()){keyOperation_=false;refreshControls();status_->setText("Could not delete key. Unlock your keyring and retry.");}
+        if(!secrets_.remove()){keyOperation_=false;refreshControls();status_->setText("Could not delete key. Check your OS credential storage and retry.");}
     });
     connect(&secrets_,&ISecretStore::writeFinished,this,[this](bool ok,const QString&){
-        if(!keyOperation_)return;keyOperation_=false;refreshControls();status_->setText(ok?"Keyring operation completed. Credential status: "+secrets_.credentialStatus(providerId_):"Keyring operation failed. Unlock your keyring and retry.");
+        if(!keyOperation_)return;keyOperation_=false;refreshControls();status_->setText(ok?"Credential storage operation completed. Credential status: "+secrets_.credentialStatus(providerId_):"Credential storage operation failed. Check your OS credential storage and retry.");
     });
     connect(&secrets_,&ISecretStore::readFinished,this,[this](const SecretResult&){refreshControls();});
     connect(testProvider_,&QPushButton::clicked,this,[this]{

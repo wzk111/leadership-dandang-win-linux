@@ -6,7 +6,7 @@ AppController::AppController(IAIProvider& ai,ISecretStore& secrets,ISelectionPro
     connect(&secrets_,&ISecretStore::readFinished,this,[this](const SecretResult& result) {
         if(!awaitingSecret_)return;
         awaitingSecret_=false;
-        if(!result.error.isEmpty()) {pendingRequest_={};complete({{},AIError::MissingKey,"Secret store unavailable. Unlock your keyring and retry."});return;}
+        if(!result.error.isEmpty()) {pendingRequest_={};complete({{},AIError::MissingKey,"Secret store unavailable. Check your OS credential storage and retry."});return;}
         pendingRequest_.apiKey=result.key;
         const bool accepted=ai_.generate(pendingRequest_);pendingRequest_={};
         if(!accepted)complete({{},AIError::Network,"Another AI request is in progress."});

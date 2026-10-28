@@ -11,13 +11,13 @@ CredentialService::CredentialService(QMap<QString,ISecretStore*> stores,QObject*
             active_=false;operation_=-1;
             status_[provider]=!result.error.isEmpty()?"unavailable":result.key.isEmpty()?"not saved":"saved";
             // Backend errors must not expose credentials or provider attributes.
-            emit readFinished(result.error.isEmpty()?result:SecretResult{{},"Secret store unavailable or locked. Unlock your keyring and retry."});
+            emit readFinished(result.error.isEmpty()?result:SecretResult{{},"Secret store unavailable or locked. Check your OS credential storage and retry."});
         });
         connect(store,&ISecretStore::writeFinished,this,[this,provider](bool success,const QString&) {
             if(!active_ || selected_!=provider || (operation_!=1 && operation_!=2))return;
             const auto operation=operation_;active_=false;operation_=-1;
             status_[provider]=success?(operation==1?"saved":"not saved"):"unavailable";
-            emit writeFinished(success,success?"Secure key storage updated.":"Secret store unavailable or locked. Unlock your keyring and retry.");
+            emit writeFinished(success,success?"Secure key storage updated.":"Secret store unavailable or locked. Check your OS credential storage and retry.");
         });
     }
 }
