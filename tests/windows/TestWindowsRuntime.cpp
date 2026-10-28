@@ -10,6 +10,37 @@
 #include "WindowsFixture.h"
 using namespace ws;
 namespace {
+class RecordingMonitor final:public WindowsSelectionMonitor {
+public:
+    explicit RecordingMonitor(quintptr fixture):fixture_(fixture){clock_.start();}
+    void dumpTrace()const {
+        qInfo()<<"Native gesture thresholds: doubleClickMs="<<GetDoubleClickTime()
+            <<"doubleClickHalfWidth="<<GetSystemMetrics(SM_CXDOUBLECLK)/2
+            <<"doubleClickHalfHeight="<<GetSystemMetrics(SM_CYDOUBLECLK)/2
+            <<"dragWidth="<<GetSystemMetrics(SM_CXDRAG)<<"dragHeight="<<GetSystemMetrics(SM_CYDRAG);
+        for(const auto& line:trace_)qInfo().noquote()<<line;
+        if(dropped_)qInfo()<<"Native trace entries dropped after bounded limit="<<dropped_;
+    }
+protected:
+    void processMouse(bool down,QPoint point,quint32 timestamp,quintptr target)override {
+        const auto event=++event_;
+        if(target==fixture_)record(QString("event=%1 elapsed=%2 mouse=%3 x=%4 y=%5 timestamp=%6 fixture=%7")
+            .arg(event).arg(clock_.elapsed()).arg(down?"down":"up").arg(point.x()).arg(point.y()).arg(timestamp).arg(qulonglong(fixture_)));
+        else record(QString("event=%1 elapsed=%2 mouse outside fixture [coordinates, timestamp and identity redacted]").arg(event).arg(clock_.elapsed()));
+        WindowsSelectionMonitor::processMouse(down,point,timestamp,target);
+        record(QString("event=%1 after mouse: acceptedGestures=%2 result=%3").arg(event).arg(status().events).arg(status().lastResult));
+    }
+    void processForeground(quintptr window)override {
+        const auto event=++event_;
+        record(QString("event=%1 elapsed=%2 foreground=%3").arg(event).arg(clock_.elapsed())
+            .arg(window==fixture_?QString("fixture %1").arg(qulonglong(fixture_)):QString("outside fixture [identity redacted]")));
+        WindowsSelectionMonitor::processForeground(window);
+        record(QString("event=%1 after foreground: acceptedGestures=%2 result=%3").arg(event).arg(status().events).arg(status().lastResult));
+    }
+private:
+    void record(const QString& line){if(trace_.size()<128)trace_<<line;else ++dropped_;}
+    quintptr fixture_;QElapsedTimer clock_;QStringList trace_;quint64 event_=0,dropped_=0;
+};
 struct FixtureCleanup {
     QProcess& process;HWND window=nullptr;
     ~FixtureCleanup(){
@@ -69,7 +100,7 @@ private slots:
     // The first quarter of this fixed one-line synthetic phrase lies inside "synthetic".
     const POINT point{rect.left()+rect.width()/4,rect.top()+rect.height()/2};
     QCOMPARE(GetForegroundWindow(),source);QCOMPARE(GetAncestor(WindowFromPoint(point),GA_ROOT),source);
-    WindowsSelectionMonitor monitor;QSignalSpy selected(&monitor,&ISelectionMonitor::selectionDetected);
+    RecordingMonitor monitor{quintptr(handle)};QSignalSpy selected(&monitor,&ISelectionMonitor::selectionDetected);
     QVERIFY2(monitor.start(),qPrintable(monitor.status().description));QVERIFY(monitor.status().running);
     QCOMPARE(selected.size(),0);QVERIFY(SetCursorPos(point.x,point.y));
     QCOMPARE(GetForegroundWindow(),source);QCOMPARE(GetAncestor(WindowFromPoint(point),GA_ROOT),source);
@@ -87,6 +118,7 @@ private slots:
         <<"foreground="<<reinterpret_cast<quintptr>(GetForegroundWindow())<<"fixture="<<quintptr(handle)
         <<"latestChars="<<(latest?latest->text.size():0)<<"latestAnchor="<<bool(latest && latest->anchorRect);
     if(selected.isEmpty()){
+        monitor.dumpTrace();
         // Probe only the same synthetic fixture, separating native selection from hook delivery.
         QVERIFY(query.request(quintptr(handle)));QElapsedTimer probeWait;probeWait.start();
         while(queried.isEmpty() && probeWait.elapsed()<6000)QTest::qWait(20);

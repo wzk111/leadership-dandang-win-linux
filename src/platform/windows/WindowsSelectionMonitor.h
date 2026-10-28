@@ -23,8 +23,8 @@ protected:
     virtual void releaseHooks();
     virtual quintptr foregroundWindow()const;
     virtual bool isExternalWindow(quintptr hwnd)const;
-    void processMouse(bool down,QPoint point,quint32 timestamp,quintptr target);
-    void processForeground(quintptr hwnd);
+    virtual void processMouse(bool down,QPoint point,quint32 timestamp,quintptr target);
+    virtual void processForeground(quintptr hwnd);
 private:
     friend struct WindowsMonitorCallbacks;
     void invalidate(const QString& reason);
