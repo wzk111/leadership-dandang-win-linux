@@ -97,13 +97,21 @@ bool InstanceCoordinator::forward(bool trigger,bool& connected) {
         return false;
     }
     if(!sameUserServer(socket)){error_="Existing instance is not owned by this Windows user/session.";return false;}
-    socket.write(trigger?"trigger\n":"open\n");
-    if(socket.bytesToWrite()>0 && !socket.waitForBytesWritten(1500)){error_="Existing instance did not accept command.";return false;}
+    const QByteArray command=trigger?"trigger\n":"open\n";
+    if(socket.write(command)!=command.size()){error_="Existing instance did not accept command.";return false;}
+    // A fast peer may acknowledge and close before Qt reports bytesWritten.
+    // That makes waitForBytesWritten return false even though the command was
+    // accepted. The bounded, exact acknowledgment is authoritative; never resend.
+    if(socket.bytesToWrite()>0)socket.waitForBytesWritten(1500);
     QByteArray ack;QElapsedTimer timeout;timeout.start();
     while(!ack.contains('\n') && ack.size()<=16 && timeout.elapsed()<1500) {
         const auto remaining=1500-timeout.elapsed();
         if(remaining<=0)break;
-        if(!socket.bytesAvailable() && !socket.waitForReadyRead(int(remaining)))break;
+        if(!socket.bytesAvailable()) {
+            const bool ready=socket.waitForReadyRead(int(remaining));
+            // EOF can accompany the final buffered acknowledgment.
+            if(!ready && !socket.bytesAvailable())break;
+        }
         ack+=socket.read(17-ack.size());
     }
     if(ack!="ok\n"){error_="Existing instance did not acknowledge; retry when responsive.";return false;}

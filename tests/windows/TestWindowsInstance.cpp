@@ -4,6 +4,7 @@
 #include <QLocalSocket>
 #include <QTextStream>
 #include <QDir>
+#include <QThread>
 #include <windows.h>
 #include <aclapi.h>
 #include <sddl.h>
@@ -38,6 +39,33 @@ static bool privateAcl(HANDLE handle,SE_OBJECT_TYPE objectType=SE_FILE_OBJECT) {
 class TestWindowsInstance:public QObject {
  Q_OBJECT
 private slots:
+ void delayedQtWriterWithExternalOwner(){
+    QTemporaryDir dir;QProcess owner;
+    owner.start(QCoreApplication::applicationFilePath(),{"--peer",dir.filePath("ipc"),"--endpoint"});
+    struct StopOwner {QProcess& process;~StopOwner(){if(process.state()!=QProcess::NotRunning){process.kill();process.waitForFinished(3000);}}} stop{owner};
+    QVERIFY(owner.waitForStarted(3000));QByteArray output;
+    QTRY_VERIFY_WITH_TIMEOUT(([&]{output+=owner.readAllStandardOutput();return output.count('\n')>=2 || owner.state()==QProcess::NotRunning;})(),5000);
+    const auto lines=output.split('\n');QVERIFY(lines.size()>=3);
+    QVERIFY2(lines[0].trimmed()=="primary",owner.readAllStandardError().constData());
+    const auto endpoint=QString::fromUtf8(lines[1].trimmed());QVERIFY(endpoint.startsWith("WorkSidekick-"));
+    for(int iteration=0;iteration<10;++iteration){
+        QLocalSocket client;client.connectToServer(endpoint);QVERIFY(client.waitForConnected(500));
+        QCOMPARE(client.write("trigger\n"),qint64(8));
+        qInfo("Delayed writer iteration=%d before sleep pending=%lld state=%d available=%lld",iteration,
+            static_cast<long long>(client.bytesToWrite()),int(client.state()),static_cast<long long>(client.bytesAvailable()));
+        // The separate owner can consume and acknowledge while this client is descheduled.
+        QThread::msleep(50);
+        const auto pending=client.bytesToWrite();
+        qInfo("Delayed writer iteration=%d after sleep pending=%lld state=%d available=%lld",iteration,
+            static_cast<long long>(pending),int(client.state()),static_cast<long long>(client.bytesAvailable()));
+        const bool written=client.waitForBytesWritten(500);
+        QByteArray ack=client.readAll();
+        if(ack.size()<3){client.waitForReadyRead(500);ack+=client.readAll();}
+        qInfo("Delayed writer iteration=%d waitWritten=%d pending=%lld state=%d ackBytes=%lld earlyFailureCondition=%d",iteration,
+            int(written),static_cast<long long>(client.bytesToWrite()),int(client.state()),static_cast<long long>(ack.size()),int(pending>0 && !written));
+        QCOMPARE(ack,QByteArray("ok\n"));
+    }
+ }
  void nativeAclsAndBoundedProtocol() {
     QTemporaryDir dir;const auto path=dir.filePath("ipc");InstanceCoordinator instance(path);
     QVERIFY2(instance.start(false)==InstanceCoordinator::Result::Primary,qPrintable(instance.error()));
@@ -79,6 +107,7 @@ int main(int argc,char** argv) {
         if(result==InstanceCoordinator::Result::Forwarded)return 0;
         if(result!=InstanceCoordinator::Result::Primary){QTextStream(stderr)<<instance.error()<<Qt::endl;return 2;}
         QTextStream(stdout)<<"primary\n"<<Qt::flush;
+        if(args.contains("--endpoint"))QTextStream(stdout)<<instance.endpoint()<<'\n'<<Qt::flush;
         QObject::connect(&instance,&InstanceCoordinator::triggerRequested,&app,[]{QTextStream(stdout)<<"trigger\n"<<Qt::flush;});
         QObject::connect(&instance,&InstanceCoordinator::openRequested,&app,[]{QTextStream(stdout)<<"open\n"<<Qt::flush;});
         return app.exec();
