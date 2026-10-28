@@ -9,9 +9,9 @@
 #include <sddl.h>
 #include "app/InstanceCoordinator.h"
 using namespace ws;
-static bool privateAcl(HANDLE handle) {
+static bool privateAcl(HANDLE handle,SE_OBJECT_TYPE objectType=SE_FILE_OBJECT) {
     PACL acl=nullptr;PSECURITY_DESCRIPTOR descriptor=nullptr;
-    const DWORD securityError=GetSecurityInfo(handle,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&acl,nullptr,&descriptor);
+    const DWORD securityError=GetSecurityInfo(handle,objectType,DACL_SECURITY_INFORMATION,nullptr,nullptr,&acl,nullptr,&descriptor);
     if(securityError!=ERROR_SUCCESS){qWarning("ACL inspection GetSecurityInfo error=%lu",securityError);return false;}
     bool good=acl && acl->AceCount>0;
     if(!good)qWarning("ACL inspection missing/empty DACL");
@@ -49,7 +49,7 @@ private slots:
     const auto pipe=(QStringLiteral("\\\\.\\pipe\\")+instance.endpoint()).toStdWString();
     HANDLE security=CreateFileW(pipe.c_str(),READ_CONTROL|GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
     QVERIFY2(security!=INVALID_HANDLE_VALUE,qPrintable(QString("Open pipe security handle failed: %1").arg(GetLastError())));
-    const bool securePipe=privateAcl(security);CloseHandle(security);QVERIFY(securePipe);
+    const bool securePipe=privateAcl(security,SE_KERNEL_OBJECT);CloseHandle(security);QVERIFY(securePipe);
     QCoreApplication::processEvents();
     QLocalSocket client;client.connectToServer(instance.endpoint());QVERIFY(client.waitForConnected());
     QSignalSpy triggers(&instance,&InstanceCoordinator::triggerRequested);
