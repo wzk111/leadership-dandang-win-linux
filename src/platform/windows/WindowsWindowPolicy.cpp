@@ -1,6 +1,7 @@
 #include "WindowsWindowPolicy.h"
 #include <QGuiApplication>
 #include <QScreen>
+#include <QWindowsScreen>
 #include <QEvent>
 #include <windows.h>
 #include <cmath>
@@ -71,8 +72,11 @@ std::optional<BarPlacement> WindowsWindowPolicy::positionActionBar(QWidget& wind
     const auto monitor=MonitorFromRect(&rectangle,MONITOR_DEFAULTTONEAREST);
     MONITORINFOEXW info{};info.cbSize=sizeof(info);
     if(!monitor || !GetMonitorInfoW(monitor,reinterpret_cast<MONITORINFO*>(&info)))return {};
-    QScreen* screen=nullptr;const auto name=QString::fromWCharArray(info.szDevice);
-    for(auto* candidate:QGuiApplication::screens())if(candidate->name().compare(name,Qt::CaseInsensitive)==0){screen=candidate;break;}
+    QScreen* screen=nullptr;
+    for(auto* candidate:QGuiApplication::screens()) {
+        const auto* native=candidate->nativeInterface<QNativeInterface::QWindowsScreen>();
+        if(native && native->handle()==monitor){screen=candidate;break;}
+    }
     // Do not guess the primary screen for an unmatched mixed-DPI monitor.
     if(!screen)return {};
     const QRect physical(info.rcMonitor.left,info.rcMonitor.top,info.rcMonitor.right-info.rcMonitor.left,info.rcMonitor.bottom-info.rcMonitor.top);

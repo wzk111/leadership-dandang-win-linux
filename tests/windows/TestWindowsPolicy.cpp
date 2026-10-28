@@ -1,6 +1,7 @@
 #include <QtTest>
 #include <QPushButton>
 #include <QScreen>
+#include <QWindowsScreen>
 #include <QProcess>
 #include <QFile>
 #include "platform/windows/WindowsWindowPolicy.h"
@@ -35,6 +36,17 @@ private slots:
     void rejectsInvalidGeometry() {
         QVERIFY(!WindowsWindowPolicy::physicalToLogical({},QRect(0,0,100,100),QRect(0,0,100,100),1));
         QVERIFY(!WindowsWindowPolicy::physicalToLogical(QRect(1,1,5,5),QRect(0,0,100,100),QRect(0,0,100,100),0));
+    }
+    void nativeMonitorIdentityAndPlacement() {
+        WindowsWindowPolicy policy;ActionBar bar;QVERIFY(policy.configureActionBar(bar));
+        for(auto* screen:QGuiApplication::screens()) {
+            const auto* native=screen->nativeInterface<QNativeInterface::QWindowsScreen>();QVERIFY(native);
+            MONITORINFOEXW info{};info.cbSize=sizeof(info);
+            QVERIFY(GetMonitorInfoW(native->handle(),reinterpret_cast<MONITORINFO*>(&info)));
+            const QRect anchor(info.rcMonitor.left+100,info.rcMonitor.top+100,100,20);
+            const auto placement=policy.positionActionBar(bar,anchor);QVERIFY(placement);
+            QVERIFY(screen->availableGeometry().contains(placement->geometry));
+        }
     }
     void nativeStylesAndMouseActivation() {
         if(QGuiApplication::platformName()!="windows")QSKIP("Requires native Qt Windows platform.");
@@ -108,7 +120,8 @@ private slots:
                     const QRect physical(info.rcMonitor.left,info.rcMonitor.top,info.rcMonitor.right-info.rcMonitor.left,info.rcMonitor.bottom-info.rcMonitor.top);
                     qInfo()<<"Native monitor device"<<device<<"physical geometry"<<physical;
                     for(auto* screen:QGuiApplication::screens()) {
-                        const bool matched=monitorInfo && screen->name().compare(device,Qt::CaseInsensitive)==0;
+                        const auto* native=screen->nativeInterface<QNativeInterface::QWindowsScreen>();
+                        const bool matched=monitorInfo && native && native->handle()==monitor;
                         qInfo()<<"Qt screen"<<screen->name()<<"geometry"<<screen->geometry()
                                <<"available"<<screen->availableGeometry()<<"DPR"<<screen->devicePixelRatio()<<"device matched"<<matched;
                         if(matched) {
