@@ -43,7 +43,7 @@ Application::Application(AppController& controller, ISecretStore& secrets, QSett
     menu_.addAction("Settings", this, &Application::openSettings);
     menu_.addAction("Diagnostics", this, &Application::openDiagnostics);
     menu_.addAction("About", this, [this] {
-        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick 0.6 — M5\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
+        QMessageBox::about(&workspace_, "WorkSidekick", "WorkSidekick " WORKSIDEKICK_VERSION " — M6 RC\nExplicit selection / clipboard AI assistant.\nYou review and copy; nothing is sent automatically.");
     });
     menu_.addSeparator(); menu_.addAction("Quit", qApp, &QApplication::quit);
     tray_.setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
@@ -105,7 +105,7 @@ void Application::refreshDiagnostics() {
     refreshManualDiagnostics();
     refreshProductDiagnostics();
     diagnosticsText_->setPlainText(QString(
-        "WorkSidekick 0.6 — M5\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
+        "WorkSidekick " WORKSIDEKICK_VERSION " — M6 RC\nOS: %1\nDesktop: %2\nXDG_SESSION_TYPE: %3\nQt: %4\nQt platform: %5\n"
         "Selection mode: native selection toolbar / explicit clipboard\nNative selection status: see local selection panel below\n"
         "Manual fallback: see selection actions panel\nPortal probe: on explicit enable / enabled startup\n"
         "Shortcut status: see selection actions panel\nAutomatic popup: see overlay panel\n"

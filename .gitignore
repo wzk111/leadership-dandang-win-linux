@@ -2,6 +2,8 @@
 /.cache/
 /.tools/
 /.local/
+/dist/
+__pycache__/
 *.user
 *.log
 .env

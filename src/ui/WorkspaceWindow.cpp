@@ -12,7 +12,10 @@ WorkspaceWindow::WorkspaceWindow(QWidget* parent) : QWidget(parent) {
     auto* layout = new QVBoxLayout(this);
     auto* title = new QLabel("WorkSidekick", this);
     QFont font = title->font(); font.setPointSize(20); font.setBold(true); title->setFont(font);
-    auto* help = new QLabel("Copy text in another app, load it here, then choose an action.\nPersonalized actions include your saved Profile when enabled. Reply opens a preview before you generate.", this);
+    auto* help = new QLabel("Getting started: Open Settings, choose a provider, save its key securely and enter a model ID.\n"
+        "Select or copy text, then use the toolbar, an enabled Ctrl+Alt+P shortcut, or Process Clipboard.\n"
+        "Choose an action to send text. Review the result before copying. Reply opens a preview first.\n"
+        "Personalized actions include your local Profile when enabled. Detection alone sends nothing.", this);
     help->setWordWrap(true);
     trayNotice_ = new QLabel(this); trayNotice_->setWordWrap(true);
     process_ = new QPushButton("Process Clipboard", this); process_->setObjectName("processClipboard");

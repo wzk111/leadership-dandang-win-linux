@@ -1,5 +1,14 @@
-name: Ubuntu M4
-on: [push, pull_request, workflow_dispatch]
+name: Ubuntu M6
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -7,10 +16,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config qt6-base-dev libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core xvfb dbus-x11 gnome-keyring libx11-dev libxtst-dev openbox
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config qt6-base-dev qt6-wayland libgl1-mesa-dev libsecret-1-dev libatspi2.0-dev at-spi2-core xvfb dbus-x11 gnome-keyring libx11-dev libxtst-dev openbox dpkg-dev desktop-file-utils
       - run: /usr/bin/cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: /usr/bin/cmake --build build --parallel 2
       - name: Tests
@@ -26,3 +37,22 @@ jobs:
 
       - name: X11 overlay focus, placement and global shortcut
         run: dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 bash scripts/test-overlay.sh
+      - name: AT-SPI listener lifecycle stress on controlled bus
+        run: dbus-run-session -- xvfb-run -a env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 WS_M6_NATIVE_ATSPI=1 ./build/test_linux_stability nativeAtSpiListenerLifecycle100
+      - name: Package audit regression tests
+        run: python3 tests/test_package_audit.py
+      - name: Package DEB, inspect dependencies and audit archive payload
+        run: bash scripts/package-linux.sh build dist/linux
+      - name: Clean Ubuntu 22.04 package install, non-root launch and uninstall
+        run: bash scripts/test-linux-package.sh 'dist/linux/worksidekick_0.7.0~rc1_amd64.deb' dist/linux
+      - name: Upload Ubuntu release candidate and package evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-release-packages
+          path: |
+            dist/linux/*.deb
+            dist/linux/SHA256SUMS.txt
+            dist/linux/*.txt
+            dist/linux/package-manifest.json
+          if-no-files-found: warn

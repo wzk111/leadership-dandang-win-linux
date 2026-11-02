@@ -1,0 +1,66 @@
+name: M6 release candidate
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit SHA or tag to build (workflow must exist at that ref)
+        required: true
+        type: string
+  push:
+    tags: ['v0.7.0-rc1']
+permissions:
+  contents: read
+jobs:
+  resolve-source:
+    runs-on: ubuntu-22.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - id: source
+        name: Resolve one immutable source for both platforms
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  windows:
+    needs: resolve-source
+    uses: ./.github/workflows/windows.yml
+    with:
+      ref: ${{ needs.resolve-source.outputs.sha }}
+  ubuntu:
+    needs: resolve-source
+    uses: ./.github/workflows/ubuntu.yml
+    with:
+      ref: ${{ needs.resolve-source.outputs.sha }}
+  candidate-summary:
+    needs: [windows, ubuntu]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release-packages'
+          path: candidate
+      - name: Verify artifact checksums and create summary
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.ref || github.ref }}
+        run: |
+          set -euo pipefail
+          for platform in candidate/*; do
+            (cd "$platform" && sha256sum --check SHA256SUMS.txt)
+          done
+          {
+            echo '# WorkSidekick 0.7.0-rc1 candidate artifacts'
+            echo "Requested ref: $REQUESTED_REF"
+            echo 'Exact built commit and tool versions are recorded in package metadata.'
+            echo 'Windows and Ubuntu regression and package smoke jobs completed.'
+            echo 'Real Windows/GNOME desktop acceptance is a separate gate; inspect the M6 reports.'
+            echo 'Unsigned candidate. No GitHub Release is published by this workflow.'
+            echo '## SHA-256'
+            find candidate -name SHA256SUMS.txt -exec cat {} \;
+          } > candidate/RELEASE-SUMMARY.md
+          cat candidate/RELEASE-SUMMARY.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worksidekick-0.7.0-rc1-candidate
+          path: candidate/

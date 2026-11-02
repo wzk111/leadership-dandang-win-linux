@@ -1,0 +1,15 @@
+application=WorkSidekick
+version=@PROJECT_VERSION@
+package_version=@CPACK_DEBIAN_PACKAGE_VERSION@
+source_sha=@WS_PACKAGE_SOURCE_SHA@
+source_tracked_changes=@WS_PACKAGE_SOURCE_DIRTY@
+compiler=@CMAKE_CXX_COMPILER_ID@ @CMAKE_CXX_COMPILER_VERSION@
+compiler_path=@CMAKE_CXX_COMPILER@
+qt=@Qt6Core_VERSION@
+cmake=@CMAKE_VERSION@
+cpack=@CMAKE_VERSION@
+build_type=@CMAKE_BUILD_TYPE@
+target_system=@CMAKE_SYSTEM_NAME@ @CMAKE_SYSTEM_VERSION@
+target_processor=@CMAKE_SYSTEM_PROCESSOR@
+os_release_begin
+@WS_PACKAGE_OS_RELEASE@os_release_end

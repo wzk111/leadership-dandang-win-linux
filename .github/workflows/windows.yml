@@ -1,13 +1,24 @@
-name: Windows M5
-on: [push, pull_request, workflow_dispatch]
+name: Windows M6
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
 jobs:
   build-test:
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
@@ -30,6 +41,18 @@ jobs:
         run: |
           $process = Start-Process -FilePath .\build\worksidekick.exe -ArgumentList '--smoke-test' -PassThru -Wait -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { throw "Launch smoke failed: $($process.ExitCode)" }
+      - name: Product portable ZIP and per-user installer
+        shell: pwsh
+        run: ./scripts/package-windows.ps1 -BuildDirectory build -ArtifactDirectory build/packages -Version 0.7.0-rc1
+      - name: Product portable and installer lifecycle smoke
+        shell: pwsh
+        run: ./scripts/test-windows-package.ps1 -ArtifactDirectory build/packages -Version 0.7.0-rc1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-release-packages
+          if-no-files-found: error
+          path: build/packages/
       - name: Package native validation binaries
         if: always()
         run: |
