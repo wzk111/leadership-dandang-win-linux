@@ -28,12 +28,13 @@ if (!(Test-Path -LiteralPath $InnoCompiler -PathType Leaf)) { throw 'Install Inn
 $inno = (Get-Item -LiteralPath $InnoCompiler).VersionInfo
 Write-Output "Inno Setup compiler: $InnoCompiler; ProductVersion=$($inno.ProductVersion); FileVersion=$($inno.FileVersion)"
 $innoHelp = (& $InnoCompiler '/?' 2>&1 | Out-String)
-if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compiler help command failed.' }
+$innoHelpExit = $LASTEXITCODE
+Write-Output "ISCC /? exit code: $innoHelpExit; first 4096 help characters:"
+Write-Output $innoHelp.Substring(0, [Math]::Min(4096, $innoHelp.Length))
 # ISCC's PE version resources can legitimately be 0.0.0.0. Its own compiler
 # engine banner identifies the engine that will actually compile the installer.
 $innoVersionMatch = [regex]::Match($innoHelp, '(?im)^\s*Compiler engine version:\s*Inno Setup\s+(?<version>\d+\.\d+\.\d+)(?:[^\S\r\n]+[^\r\n]*)?\r?$')
-if (!$innoVersionMatch.Success -or $innoVersionMatch.Groups['version'].Value -ne '6.7.0') {
-    Write-Output $innoHelp
+if ($innoHelpExit -notin @(0, 1) -or !$innoVersionMatch.Success -or $innoVersionMatch.Groups['version'].Value -ne '6.7.0') {
     throw 'Pinned Inno Setup 6.7.0 is required; compiler engine banner did not match.'
 }
 $innoVersion = $innoVersionMatch.Groups['version'].Value
