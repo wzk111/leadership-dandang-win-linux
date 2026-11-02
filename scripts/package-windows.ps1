@@ -27,18 +27,18 @@ if (!$InnoCompiler) {
 if (!(Test-Path -LiteralPath $InnoCompiler -PathType Leaf)) { throw 'Install Inno Setup 6 first or supply -InnoCompiler; this script never downloads installers.' }
 $inno = (Get-Item -LiteralPath $InnoCompiler).VersionInfo
 Write-Output "Inno Setup compiler: $InnoCompiler; ProductVersion=$($inno.ProductVersion); FileVersion=$($inno.FileVersion)"
-$innoHelp = (& $InnoCompiler '/?' 2>&1 | Out-String)
-$innoHelpExit = $LASTEXITCODE
-Write-Output "ISCC /? exit code: $innoHelpExit; first 4096 help characters:"
-Write-Output $innoHelp.Substring(0, [Math]::Min(4096, $innoHelp.Length))
-# ISCC's PE version resources can legitimately be 0.0.0.0. Its own compiler
-# engine banner identifies the engine that will actually compile the installer.
-$innoVersionMatch = [regex]::Match($innoHelp, '(?im)^\s*Compiler engine version:\s*Inno Setup\s+(?<version>\d+\.\d+\.\d+)(?:[^\S\r\n]+[^\r\n]*)?\r?$')
-if ($innoHelpExit -notin @(0, 1) -or !$innoVersionMatch.Success -or $innoVersionMatch.Groups['version'].Value -ne '6.7.0') {
-    throw 'Pinned Inno Setup 6.7.0 is required; compiler engine banner did not match.'
+$innoProbeOutput = (& $InnoCompiler (Join-Path $repo 'packaging/windows/CompilerProbe.iss') 2>&1 | Out-String)
+$innoProbeExit = $LASTEXITCODE
+Write-Output "ISCC compiler preprocessor probe exit code: $innoProbeExit; first 4096 output characters:"
+Write-Output $innoProbeOutput.Substring(0, [Math]::Min(4096, $innoProbeOutput.Length))
+# The probe has a compile-time Ver/EncodeVer guard and emits DecodeVer(Ver).
+# It deliberately creates no installer or output directory.
+$innoVersionMatch = [regex]::Match($innoProbeOutput, '(?m)^\s*WORKSIDEKICK_INNO_VERSION=(?<version>\d+\.\d+\.\d+)\s*$')
+if ($innoProbeExit -ne 0 -or !$innoVersionMatch.Success -or $innoVersionMatch.Groups['version'].Value -ne '6.7.0') {
+    throw 'Pinned Inno Setup 6.7.0 is required; compiler preprocessor probe failed.'
 }
 $innoVersion = $innoVersionMatch.Groups['version'].Value
-Write-Output "Inno Setup compiler engine version: $innoVersion (verified with ISCC /?)"
+Write-Output "Inno Setup compiler version: $innoVersion (verified with preprocessor Ver/DecodeVer)"
 if (!$MsvcRedistributableDirectory) {
     if (!$env:VCToolsRedistDir) { throw 'VCToolsRedistDir is missing; run from an MSVC developer shell or supply -MsvcRedistributableDirectory.' }
     $MsvcRedistributableDirectory = Join-Path $env:VCToolsRedistDir 'x64/Microsoft.VC143.CRT'
@@ -113,7 +113,7 @@ $runtimeInventory = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
     application=$Version
     qt=$qtVersion
     compiler_runtime='MSVC v143 x64 app-local, from Visual Studio redistributable directory; Windows UCRT is an OS component'
-    installer_tool="Inno Setup $innoVersion (ISCC compiler engine banner)"
+    installer_tool="Inno Setup $innoVersion (ISCC preprocessor Ver/DecodeVer)"
     qt_license_source='https://github.com/qt/qtbase/tree/v6.8.3/LICENSES'
     native_os_dependencies=@('Windows UI Automation','COM','Credential Manager','user32','advapi32','Windows TLS/Schannel')
     signing='NOT CONFIGURED - unsigned candidate'
@@ -129,7 +129,7 @@ $metadata = [ordered]@{
     qt=$qtVersion; cmake=(& cmake --version | Select-Object -First 1)
     runner=$env:RUNNER_OS; runner_image=$env:ImageOS; runner_image_version=$env:ImageVersion
     os=[Environment]::OSVersion.VersionString; inno_setup=$innoVersion
-    inno_version_source='ISCC /? compiler engine banner'; inno_pe_product_version=$inno.ProductVersion
+    inno_version_source='ISCC preprocessor Ver/DecodeVer compiled probe'; inno_pe_product_version=$inno.ProductVersion
     runtime_strategy='App-local Visual Studio redistributable CRT DLLs, no elevated redistributable installer'
     byte_reproducibility='NOT TESTED'; signing='NOT CONFIGURED'
 }
