@@ -27,10 +27,17 @@ if (!$InnoCompiler) {
 if (!(Test-Path -LiteralPath $InnoCompiler -PathType Leaf)) { throw 'Install Inno Setup 6 first or supply -InnoCompiler; this script never downloads installers.' }
 $inno = (Get-Item -LiteralPath $InnoCompiler).VersionInfo
 Write-Output "Inno Setup compiler: $InnoCompiler; ProductVersion=$($inno.ProductVersion); FileVersion=$($inno.FileVersion)"
-$innoVersionMatch = [regex]::Match($inno.ProductVersion, '(?<!\d)\d+\.\d+\.\d+(?!\d)')
-if (!$innoVersionMatch.Success -or [version]$innoVersionMatch.Value -ne [version]'6.7.0') {
-    throw 'Pinned Inno Setup 6.7.0 is required; compiler ProductVersion did not match.'
+$innoHelp = (& $InnoCompiler '/?' 2>&1 | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compiler help command failed.' }
+# ISCC's PE version resources can legitimately be 0.0.0.0. Its own compiler
+# engine banner identifies the engine that will actually compile the installer.
+$innoVersionMatch = [regex]::Match($innoHelp, '(?im)^\s*Compiler engine version:\s*Inno Setup\s+(?<version>\d+\.\d+\.\d+)(?:[^\S\r\n]+[^\r\n]*)?\r?$')
+if (!$innoVersionMatch.Success -or $innoVersionMatch.Groups['version'].Value -ne '6.7.0') {
+    Write-Output $innoHelp
+    throw 'Pinned Inno Setup 6.7.0 is required; compiler engine banner did not match.'
 }
+$innoVersion = $innoVersionMatch.Groups['version'].Value
+Write-Output "Inno Setup compiler engine version: $innoVersion (verified with ISCC /?)"
 if (!$MsvcRedistributableDirectory) {
     if (!$env:VCToolsRedistDir) { throw 'VCToolsRedistDir is missing; run from an MSVC developer shell or supply -MsvcRedistributableDirectory.' }
     $MsvcRedistributableDirectory = Join-Path $env:VCToolsRedistDir 'x64/Microsoft.VC143.CRT'
@@ -105,7 +112,7 @@ $runtimeInventory = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
     application=$Version
     qt=$qtVersion
     compiler_runtime='MSVC v143 x64 app-local, from Visual Studio redistributable directory; Windows UCRT is an OS component'
-    installer_tool=$inno.ProductVersion
+    installer_tool="Inno Setup $innoVersion (ISCC compiler engine banner)"
     qt_license_source='https://github.com/qt/qtbase/tree/v6.8.3/LICENSES'
     native_os_dependencies=@('Windows UI Automation','COM','Credential Manager','user32','advapi32','Windows TLS/Schannel')
     signing='NOT CONFIGURED - unsigned candidate'
@@ -120,7 +127,8 @@ $metadata = [ordered]@{
     compiler_path=$compilerPath; compiler_provenance='CMakeCache.txt, verified MSVC 64-bit compiler configuration and x64 PE payload'
     qt=$qtVersion; cmake=(& cmake --version | Select-Object -First 1)
     runner=$env:RUNNER_OS; runner_image=$env:ImageOS; runner_image_version=$env:ImageVersion
-    os=[Environment]::OSVersion.VersionString; inno_setup=$inno.ProductVersion
+    os=[Environment]::OSVersion.VersionString; inno_setup=$innoVersion
+    inno_version_source='ISCC /? compiler engine banner'; inno_pe_product_version=$inno.ProductVersion
     runtime_strategy='App-local Visual Studio redistributable CRT DLLs, no elevated redistributable installer'
     byte_reproducibility='NOT TESTED'; signing='NOT CONFIGURED'
 }

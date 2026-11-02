@@ -14,6 +14,17 @@ trap 'echo "ERROR: package smoke container failed at line $LINENO: $BASH_COMMAND
 export DEBIAN_FRONTEND=noninteractive
 echo 'Environment: fresh ubuntu:22.04 amd64 container; synthetic Xvfb, not GNOME'
 cat /etc/os-release
+echo 'Container dpkg path exclusion/inclusion rules before the test exception:'
+grep -R -n -E '^[[:space:]]*path-(exclude|include)' /etc/dpkg/dpkg.cfg /etc/dpkg/dpkg.cfg.d || true
+# Ubuntu's minimal container excludes most /usr/share/doc content at unpack
+# time. Preserve only this application's docs so installed provenance can be
+# tested; all dependency documentation keeps the container's default policy.
+printf '%s\n' \
+  'path-include=/usr/share/doc/worksidekick' \
+  'path-include=/usr/share/doc/worksidekick/*' \
+  > /etc/dpkg/dpkg.cfg.d/zz-worksidekick-docs
+echo 'Test-specific dpkg exception:'
+cat /etc/dpkg/dpkg.cfg.d/zz-worksidekick-docs
 apt-get update
 # Only the package and test harness are requested. Runtime libraries must be
 # supplied by the DEB dependency declarations, not the CI build environment.

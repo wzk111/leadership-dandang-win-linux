@@ -47,7 +47,8 @@ to the runner temporary directory and checks SHA-256
 `f45c7d68d1e660cf13877ec36738a5179ce72a33414f9959d35e99b68c52a697`
 before executing the installer. Installation is per-user, bounded and hidden;
 CI passes the exact installed compiler path. The package script verifies the
-compiler's ProductVersion and records its actual version and runner image
+compiler engine version from `ISCC /?` (its PE version resources may be
+`0.0.0.0`) and records the actual engine version and runner image
 version in `build-metadata.json`. The package script never downloads installers
 itself. Other runner build tools are recorded, not claimed fully pinned.
 
