@@ -40,7 +40,11 @@ ctest --test-dir build --output-on-failure
 `ArtifactDirectory` must be empty. Packaging reconfigures the current checkout
 as Release and rebuilds only `worksidekick` and `worksidekick_uia_worker` plus
 their dependencies. It verifies the cached MSVC x64 configuration and actual
-PE architecture, and records the compiler selected by CMake. The script does not download or run a runtime
+PE architecture, and records the compiler selected by CMake. Configure uses the
+selected deployment SDK's `Qt6_DIR`; every cached
+Qt module directory must resolve to that SDK and Qt6Core's package version must
+be 6.8.3. Mixed SDK caches are rejected with an instruction to use a fresh build
+directory. The script does not download or run a runtime
 installer. `-InnoCompiler` can point to an existing 6.7.0 `ISCC.exe`. CI downloads
 the [official Inno Setup 6.7.0 release](https://github.com/jrsoftware/issrc/releases/tag/is-6_7_0)
 to the runner temporary directory and checks SHA-256

@@ -50,7 +50,7 @@ configure_file("${CMAKE_CURRENT_LIST_DIR}/build-info.txt.in"
   "${CMAKE_CURRENT_BINARY_DIR}/package-build-info.txt" @ONLY)
 install(FILES "${PROJECT_SOURCE_DIR}/resources/worksidekick.svg"
   DESTINATION share/icons/hicolor/scalable/apps)
-install(FILES "${PROJECT_SOURCE_DIR}/README.md"
+install(FILES "${CMAKE_CURRENT_LIST_DIR}/README.md"
   "${PROJECT_SOURCE_DIR}/docs/privacy.md"
   "${PROJECT_SOURCE_DIR}/docs/troubleshooting.md"
   "${PROJECT_SOURCE_DIR}/packaging/THIRD_PARTY.md"

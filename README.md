@@ -1,7 +1,7 @@
 # WorkSidekick
 
-A C++20 / Qt 6 desktop assistant for explicitly chosen text. M5 (0.6.0) adds a
-Windows native backend while retaining the six shared features:
+A C++20 / Qt 6 desktop assistant for explicitly chosen text. M6 (0.7.0-rc1)
+adds packaging and stabilization to the Windows/Linux native backends, retaining:
 **Plain Speak, Summarize, Polish, Reply, Relevance and Add Insight**, an optional
 local Profile, result refinements, and four provider choices. Review results and
 copy them yourself. Selecting text never sends an AI request.
@@ -12,7 +12,37 @@ This is an independent implementation inspired by
 code was not copied. The original requirements are preserved in
 [PROJECT_SPEC.md](PROJECT_SPEC.md).
 
-## Build on Windows x64 (M5)
+## Install the M6 candidate
+
+Candidate downloads are GitHub Actions artifacts, not a signed production release.
+See [packaging evidence](docs/m6-packaging-report.md), [desktop matrix](docs/m6-desktop-compatibility.md)
+and [release checklist](docs/m6-release-checklist.md) for the actual tested scope.
+
+Windows: extract `WorkSidekick-0.7.0-rc1-windows-x64.zip` and open
+`worksidekick.exe`, or run `WorkSidekick-0.7.0-rc1-windows-x64-setup.exe` for a
+per-user installation. Keep the helper and DLLs beside the executable. The installer
+creates a Start Menu entry; desktop shortcut is optional. Autostart is not installed.
+Exit WorkSidekick before upgrading or uninstalling. Normal uninstall keeps your
+settings and OS credentials. Code signing and clean Windows machine acceptance
+are separate checklist entries.
+
+Ubuntu 22.04 amd64: download `worksidekick_0.7.0~rc1_amd64.deb`. Its dependencies
+include both Qt X11 and Wayland plugins. Launch the installed **WorkSidekick**
+desktop entry or `/usr/bin/worksidekick`. No Qt development SDK is required for
+the package. The packaging report records the exact verified install/remove commands.
+
+First launch: choose a provider in Settings, save its API key securely, enter a
+model ID, then select or copy text. Enable Automatic Toolbar and Ctrl+Alt+P
+explicitly if desired; both default OFF. Choose a feature to send the captured
+text. Reply opens a local composer before Generate. Review results before Copy.
+
+GNOME without a tray can use the normal workspace window. Native Wayland supports
+the manual palette/clipboard/`/usr/bin/worksidekick --trigger` fallback; anchored
+automatic toolbar placement is unsupported. GlobalShortcuts portal availability
+depends on the desktop. No portal registration dialog opens automatically on
+startup. Real GNOME acceptance is documented separately from Xvfb CI.
+
+## Build on Windows x64
 
 Install Visual Studio 2022 C++ desktop tools, CMake, Ninja, and Qt 6.8.3
 `msvc2022_64`. Use an x64 Native Tools terminal with Qt's `bin` on PATH and its
@@ -28,7 +58,8 @@ ctest --test-dir build --output-on-failure
 Keep `worksidekick_uia_worker.exe` beside the app. To run away from the build
 machine, deploy Qt with `windeployqt --release build\worksidekick.exe` and
 `windeployqt --release build\worksidekick_uia_worker.exe`. This is a developer
-bundle, not the M6 installer. CI also publishes native validation binaries.
+bundle. Product packages are built by `scripts/package-windows.ps1`; CI keeps
+native validation binaries in a separate developer artifact.
 
 UIA selected text supplies the existing toolbar after a drag/double-click when
 Automatic selection toolbar is enabled (default OFF). Enable Ctrl+Alt+P to query

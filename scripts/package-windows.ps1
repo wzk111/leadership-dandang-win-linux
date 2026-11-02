@@ -9,6 +9,38 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+function Assert-QtPackageCache([string]$Cache, [string]$QtRoot) {
+    $required = @('Qt6','Qt6Core','Qt6Gui','Qt6Widgets','Qt6Network','Qt6Concurrent')
+    if ($Cache -match '(?m)^BUILD_TESTING:BOOL=(?:ON|TRUE|1)\r?$') { $required += 'Qt6Test' }
+    $moduleDirectories = @{}
+    foreach ($entry in [regex]::Matches($Cache, '(?m)^(?<module>Qt6[A-Za-z0-9]*)_DIR:[^=\r\n]+=(?<directory>[^\r\n]*)\r?$')) {
+        $module = $entry.Groups['module'].Value
+        $directory = $entry.Groups['directory'].Value
+        if ($directory -match '-NOTFOUND$') { continue }
+        $expected = Join-Path $QtRoot "lib/cmake/$module"
+        if (!(Test-Path -LiteralPath $directory -PathType Container) -or !(Test-Path -LiteralPath $expected -PathType Container)) {
+            throw "Qt cache module $module does not resolve in the selected Qt SDK. Use a fresh BuildDirectory."
+        }
+        $actualPath = (Resolve-Path -LiteralPath $directory).ProviderPath.TrimEnd('\','/')
+        $expectedPath = (Resolve-Path -LiteralPath $expected).ProviderPath.TrimEnd('\','/')
+        if (![StringComparer]::OrdinalIgnoreCase.Equals($actualPath, $expectedPath)) {
+            throw "Qt cache module $module uses '$actualPath', but deployment uses '$expectedPath'. Use a fresh BuildDirectory."
+        }
+        $moduleDirectories[$module] = $actualPath
+    }
+    foreach ($module in $required) {
+        if (!$moduleDirectories.ContainsKey($module)) { throw "Required Qt cache module missing: $module. Use a fresh BuildDirectory." }
+    }
+    $coreDirectory = $moduleDirectories['Qt6Core']
+    # Qt's generated ConfigVersion wrapper may include ConfigVersionImpl.
+    $versionFile = Join-Path $coreDirectory 'Qt6CoreConfigVersionImpl.cmake'
+    if (!(Test-Path -LiteralPath $versionFile -PathType Leaf)) { $versionFile = Join-Path $coreDirectory 'Qt6CoreConfigVersion.cmake' }
+    $versionConfiguration = Get-Content -LiteralPath $versionFile -Raw
+    $versionMatch = [regex]::Match($versionConfiguration, '(?m)^\s*set\(PACKAGE_VERSION\s+"?(?<version>\d+\.\d+\.\d+)"?\s*\)')
+    if (!$versionMatch.Success -or $versionMatch.Groups['version'].Value -ne '6.8.3') {
+        throw 'The cached Qt6Core configuration is not version 6.8.3. Use the selected SDK and a fresh BuildDirectory.'
+    }
+}
 if ($env:OS -ne 'Windows_NT') { throw 'Windows packaging requires Windows x64 and an MSVC developer environment.' }
 $repo = Split-Path -Parent $PSScriptRoot
 $build = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($BuildDirectory)
@@ -18,6 +50,7 @@ if (Test-Path -LiteralPath $artifacts) {
 } else { New-Item -ItemType Directory -Path $artifacts -Force | Out-Null }
 $deploy = (Get-Command windeployqt.exe -ErrorAction Stop).Source
 $qtBin = Split-Path -Parent $deploy
+$qtRoot = Split-Path -Parent $qtBin
 $qtVersion = (Get-Item -LiteralPath (Join-Path $qtBin 'Qt6Core.dll')).VersionInfo.ProductVersion
 if ($qtVersion -notmatch '^6\.8\.3(\.|$)') { throw "Expected Qt 6.8.3 beside windeployqt, got: $qtVersion" }
 if (!$InnoCompiler) {
@@ -33,7 +66,7 @@ Write-Output "ISCC compiler preprocessor probe exit code: $innoProbeExit; first 
 Write-Output $innoProbeOutput.Substring(0, [Math]::Min(4096, $innoProbeOutput.Length))
 # The probe has a compile-time Ver/EncodeVer guard and emits DecodeVer(Ver).
 # It deliberately creates no installer or output directory.
-$innoVersionMatch = [regex]::Match($innoProbeOutput, '(?m)^\s*WORKSIDEKICK_INNO_VERSION=(?<version>\d+\.\d+\.\d+)\s*$')
+$innoVersionMatch = [regex]::Match($innoProbeOutput, '(?m)^[^\S\r\n]*(?:Line[^\S\r\n]+\d+:[^\S\r\n]*)?WORKSIDEKICK_INNO_VERSION=(?<version>\d+\.\d+\.\d+)[^\S\r\n]*\r?$')
 if ($innoProbeExit -ne 0 -or !$innoVersionMatch.Success -or $innoVersionMatch.Groups['version'].Value -ne '6.7.0') {
     throw 'Pinned Inno Setup 6.7.0 is required; compiler preprocessor probe failed.'
 }
@@ -52,9 +85,10 @@ foreach ($name in @('msvcp140.dll','vcruntime140.dll','vcruntime140_1.dll')) {
 }
 # Reconfigure and rebuild the current checkout. Never label an arbitrary old
 # executable with the current Git SHA or assume a developer's cache is Release.
-& cmake -S $repo -B $build -DCMAKE_BUILD_TYPE=Release
+& cmake -S $repo -B $build -DCMAKE_BUILD_TYPE=Release "-DQt6_DIR=$(Join-Path $qtRoot 'lib/cmake/Qt6')"
 if ($LASTEXITCODE -ne 0) { throw 'Release package configuration failed' }
 $cache = Get-Content -LiteralPath (Join-Path $build 'CMakeCache.txt') -Raw
+Assert-QtPackageCache $cache $qtRoot
 if ($cache -notmatch '(?m)^CMAKE_BUILD_TYPE:STRING=Release\r?$') { throw 'Package cache must be configured as Release.' }
 if ($cache -notmatch '(?m)^CMAKE_CXX_COMPILER:(?:FILEPATH|STRING)=(.+?)\r?$') { throw 'Cannot determine actual compiler from CMake cache.' }
 $compilerPath = $Matches[1]
@@ -126,7 +160,8 @@ $metadata = [ordered]@{
     source_dirty=[bool](& git -C $repo status --porcelain)
     compiler=(Get-Item -LiteralPath $compilerPath).VersionInfo.ProductVersion
     compiler_path=$compilerPath; compiler_provenance='CMakeCache.txt, verified MSVC 64-bit compiler configuration and x64 PE payload'
-    qt=$qtVersion; cmake=(& cmake --version | Select-Object -First 1)
+    qt=$qtVersion; qt_sdk=$qtRoot; qt_provenance='CMake cached module directories and Qt6Core package version verified against deployment SDK'
+    cmake=(& cmake --version | Select-Object -First 1)
     runner=$env:RUNNER_OS; runner_image=$env:ImageOS; runner_image_version=$env:ImageVersion
     os=[Environment]::OSVersion.VersionString; inno_setup=$innoVersion
     inno_version_source='ISCC preprocessor Ver/DecodeVer compiled probe'; inno_pe_product_version=$inno.ProductVersion

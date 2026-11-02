@@ -1,4 +1,25 @@
-# Privacy — M5
+# Privacy — M6
+
+## M6 installation and data retention
+
+Windows installation is per user, without a service, scheduled task or autostart.
+Uninstall removes program files and shortcuts, retaining settings and vault keys
+by default. No installer migrates keys into a file. The portable package also
+uses the normal user's QSettings and Credential Manager; "portable" describes
+the runnable folder, not isolated portable settings or credentials.
+
+For complete removal, first use Settings to delete the saved key for each of the
+four providers and Clear Profile, then quit and uninstall. Windows settings live
+under `HKEY_CURRENT_USER\Software\WorkSidekick\WorkSidekick`; remaining credentials
+are only the four `WorkSidekick/<provider>` targets listed below. Remove only
+those exact entries through Credential Manager if needed. Linux settings normally
+live at `~/.config/WorkSidekick/WorkSidekick.conf` (or XDG_CONFIG_HOME); keyring
+entries use schema `io.worksidekick.ApiKey` and the four provider accounts below.
+Package removal does not delete your home directory or unrelated keyring entries.
+
+Candidate package manifests reject obvious test/development/secret paths. This
+is a packaging guard, not a claim that arbitrary file content has been certified
+secret-free. CI fixtures contain synthetic text and keys; they are not shipped.
 
 ## Windows native boundaries
 

@@ -1,5 +1,22 @@
 # Architecture
 
+## M6 delivery layer (0.7.0-rc1)
+
+The shared controller, providers and native adapters retain M5 ownership. Product
+packaging is separate from developer/native-test artifacts. Windows stages only
+the application and UIA helper, deploys shared Qt and app-local MSVC runtime, then
+builds a per-user Inno Setup installer. A per-session lifetime mutex prevents
+installer/uninstaller file replacement while the primary app runs; secured IPC
+still determines primary ownership. Linux uses CPack DEB with automatic linked
+library dependencies and explicit platform-plugin/service dependencies.
+
+CI adds lifecycle stress and product install/remove smoke to the existing native
+gates. The explicit release workflow resolves one immutable source SHA for both
+platforms, verifies checksums and uploads a candidate summary. It never publishes
+a GitHub Release. Metadata records actual tool versions; Ubuntu system packages
+are repository-resolved, so the complete dependency graph is not frozen and byte
+reproducibility is NOT TESTED. Real desktop acceptance is a separate evidence gate.
+
 ## M5 platform integration (0.6.0)
 
 The shared product described below is unchanged in scope. Windows adds isolated

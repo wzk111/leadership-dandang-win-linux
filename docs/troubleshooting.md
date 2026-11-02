@@ -1,5 +1,26 @@
 # Troubleshooting
 
+## M6 installed packages
+
+Use product ZIP/installer or DEB artifacts, not the developer test bundle. Verify
+the corresponding SHA256SUMS.txt from the same CI run. Windows product folders
+contain Qt plugins, app-local MSVC runtime and `worksidekick_uia_worker.exe`; keep
+the entire folder together. Exit the tray application before upgrading/removing
+it. The installer/uninstaller refuses a running primary rather than leaving a
+partially removed program. Normal uninstall keeps local settings and vault keys.
+
+Ubuntu packages explicitly depend on `qt6-qpa-plugins` and `qt6-wayland`; a build
+machine's `qt6-base-dev` must not mask missing runtime plugins. Install the DEB
+through apt so dependencies resolve. Run as your desktop user. A locked/missing
+Secret Service requires fixing your login keyring, with no plaintext fallback.
+GNOME without tray support uses the workspace; native Wayland uses manual actions
+or `/usr/bin/worksidekick --trigger`. Portal support depends on the real desktop.
+
+If AT-SPI initialization failed or its bus is lost, fix the accessibility session
+and restart WorkSidekick. Repeated native listener start/stop is tested separately
+from bus reconnection; automatic safe recovery from bus loss is not claimed.
+See the M6 desktop, packaging and stability reports for actual acceptance scope.
+
 ## Windows M5
 
 - Missing Qt DLL/platform plugin: run the matching Qt 6.8.3 MSVC x64 windeployqt
