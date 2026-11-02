@@ -18,9 +18,9 @@ set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 # dlopen() plugins/services are not discovered by dpkg-shlibdeps. On Ubuntu
-# 22.04 libqt6gui6 owns platforms/libqxcb.so; qt6-wayland owns the Wayland QPA
+# 22.04 qt6-qpa-plugins owns platforms/libqxcb.so; qt6-wayland owns the Wayland QPA
 # plugins. Keep both explicit even when the build only exercised X11.
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6gui6 (>= 6.2), qt6-wayland (>= 6.2), at-spi2-core, ca-certificates")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6gui6 (>= 6.2), qt6-qpa-plugins (>= 6.2), qt6-wayland (>= 6.2), at-spi2-core, ca-certificates")
 set(CPACK_DEBIAN_PACKAGE_SUGGESTS "gnome-keyring")
 set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION ON)

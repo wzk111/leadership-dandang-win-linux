@@ -11,8 +11,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'Windows packaging requires Windows x64 and an MSVC developer environment.' }
 $repo = Split-Path -Parent $PSScriptRoot
-$build = (Resolve-Path -LiteralPath $BuildDirectory).Path
-$artifacts = [System.IO.Path]::GetFullPath($ArtifactDirectory)
+$build = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($BuildDirectory)
+$artifacts = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ArtifactDirectory)
 if (Test-Path -LiteralPath $artifacts) {
     if (Get-ChildItem -LiteralPath $artifacts -Force) { throw 'ArtifactDirectory must be empty; stale release files are not accepted.' }
 } else { New-Item -ItemType Directory -Path $artifacts -Force | Out-Null }
@@ -26,7 +26,11 @@ if (!$InnoCompiler) {
 }
 if (!(Test-Path -LiteralPath $InnoCompiler -PathType Leaf)) { throw 'Install Inno Setup 6 first or supply -InnoCompiler; this script never downloads installers.' }
 $inno = (Get-Item -LiteralPath $InnoCompiler).VersionInfo
-if ($inno.FileMajorPart -ne 6 -or $inno.FileMinorPart -lt 3) { throw 'Inno Setup 6.3 or later in major version 6 is required.' }
+Write-Output "Inno Setup compiler: $InnoCompiler; ProductVersion=$($inno.ProductVersion); FileVersion=$($inno.FileVersion)"
+$innoVersionMatch = [regex]::Match($inno.ProductVersion, '(?<!\d)\d+\.\d+\.\d+(?!\d)')
+if (!$innoVersionMatch.Success -or [version]$innoVersionMatch.Value -ne [version]'6.7.0') {
+    throw 'Pinned Inno Setup 6.7.0 is required; compiler ProductVersion did not match.'
+}
 if (!$MsvcRedistributableDirectory) {
     if (!$env:VCToolsRedistDir) { throw 'VCToolsRedistDir is missing; run from an MSVC developer shell or supply -MsvcRedistributableDirectory.' }
     $MsvcRedistributableDirectory = Join-Path $env:VCToolsRedistDir 'x64/Microsoft.VC143.CRT'
@@ -38,6 +42,25 @@ if ((Split-Path -Leaf $crt) -ne 'Microsoft.VC143.CRT' -or (Split-Path -Leaf (Spl
 foreach ($name in @('msvcp140.dll','vcruntime140.dll','vcruntime140_1.dll')) {
     if (!(Test-Path -LiteralPath (Join-Path $crt $name))) { throw "Required redistributable missing: $name" }
 }
+# Reconfigure and rebuild the current checkout. Never label an arbitrary old
+# executable with the current Git SHA or assume a developer's cache is Release.
+& cmake -S $repo -B $build -DCMAKE_BUILD_TYPE=Release
+if ($LASTEXITCODE -ne 0) { throw 'Release package configuration failed' }
+$cache = Get-Content -LiteralPath (Join-Path $build 'CMakeCache.txt') -Raw
+if ($cache -notmatch '(?m)^CMAKE_BUILD_TYPE:STRING=Release\r?$') { throw 'Package cache must be configured as Release.' }
+if ($cache -notmatch '(?m)^CMAKE_CXX_COMPILER:(?:FILEPATH|STRING)=(.+?)\r?$') { throw 'Cannot determine actual compiler from CMake cache.' }
+$compilerPath = $Matches[1]
+$compilerConfiguration = Get-ChildItem -LiteralPath (Join-Path $build 'CMakeFiles') -Filter CMakeCXXCompiler.cmake -Recurse -File | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+if (!$compilerConfiguration) { throw 'CMake compiler configuration missing.' }
+$compilerInfo = Get-Content -LiteralPath $compilerConfiguration.FullName -Raw
+if ($compilerInfo -notmatch 'set\(CMAKE_CXX_COMPILER_ID "MSVC"\)' -or
+    $compilerInfo -notmatch 'set\(CMAKE_CXX_SIZEOF_DATA_PTR "?8"?\)' -or
+    $compilerInfo -notmatch 'set\(CMAKE_CXX_COMPILER_ARCHITECTURE_ID "?x64"?\)') {
+    throw 'Package requires an MSVC x64 compiler configuration.'
+}
+& cmake --build $build --config Release --target worksidekick worksidekick_uia_worker --parallel 4
+if ($LASTEXITCODE -ne 0) { throw 'Release product rebuild failed' }
+$binaryDirectory = if ($cache -match '(?m)^CMAKE_CONFIGURATION_TYPES:STRING=') { Join-Path $build 'Release' } else { $build }
 # A new, dedicated stage is populated by an explicit product allowlist. The
 # native developer artifact may contain tests, but is never copied into here.
 $prefix = "WorkSidekick-$Version-windows-x64"
@@ -45,9 +68,16 @@ $stageParent = Join-Path $build ('package-stage-' + [guid]::NewGuid().ToString('
 $stage = Join-Path $stageParent $prefix
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 foreach ($name in @('worksidekick.exe','worksidekick_uia_worker.exe')) {
-    $source = Join-Path $build $name
-    if (!(Test-Path -LiteralPath $source)) { $source = Join-Path $build "Release/$name" }
+    $source = Join-Path $binaryDirectory $name
     if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw "Build the Release product target first: $name" }
+    $binary = [System.IO.File]::OpenRead($source)
+    $reader = [System.IO.BinaryReader]::new($binary)
+    try {
+        if ($reader.ReadUInt16() -ne 0x5A4D) { throw "Invalid executable: $name" }
+        $binary.Position = 0x3C; $peOffset = $reader.ReadUInt32()
+        $binary.Position = $peOffset
+        if ($reader.ReadUInt32() -ne 0x00004550 -or $reader.ReadUInt16() -ne 0x8664) { throw "Product executable must be PE x64: $name" }
+    } finally { $reader.Dispose() }
     Copy-Item -LiteralPath $source -Destination $stage
     & $deploy --release --no-translations --no-compiler-runtime (Join-Path $stage $name)
     if ($LASTEXITCODE -ne 0) { throw "windeployqt failed for $name" }
@@ -83,11 +113,11 @@ $runtimeInventory = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'dependency-inventory.json') -Encoding utf8
 $commit = (& git -C $repo rev-parse HEAD | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Cannot determine source commit' }
-$compiler = Get-Command cl.exe -ErrorAction Stop
 $metadata = [ordered]@{
     commit=$commit; version=$Version; configuration='Release'; architecture='x64'
     source_dirty=[bool](& git -C $repo status --porcelain)
-    compiler=(Get-Item -LiteralPath $compiler.Source).VersionInfo.ProductVersion
+    compiler=(Get-Item -LiteralPath $compilerPath).VersionInfo.ProductVersion
+    compiler_path=$compilerPath; compiler_provenance='CMakeCache.txt, verified MSVC 64-bit compiler configuration and x64 PE payload'
     qt=$qtVersion; cmake=(& cmake --version | Select-Object -First 1)
     runner=$env:RUNNER_OS; runner_image=$env:ImageOS; runner_image_version=$env:ImageVersion
     os=[Environment]::OSVersion.VersionString; inno_setup=$inno.ProductVersion

@@ -8,6 +8,15 @@
 #include "platform/ClipboardSelectionProvider.h"
 #include "app/Application.h"
 #include "app/InstanceCoordinator.h"
+#ifdef Q_OS_WIN
+#include <windows.h>
+namespace {
+struct InstallerLifetime {
+    HANDLE mutex=nullptr;
+    ~InstallerLifetime() { if(mutex)CloseHandle(mutex); }
+};
+}
+#endif
 int main(int argc, char** argv) {
     ws::preparePlatformEventLoop();
     QApplication app(argc, argv);
@@ -18,10 +27,19 @@ int main(int argc, char** argv) {
     parser.addOption({"trigger","Open local selection actions in the existing instance."});
     parser.process(app);
     ws::InstanceCoordinator instance;
+#ifdef Q_OS_WIN
+    // Inno Setup checks this per-session lifetime marker before replacing or
+    // uninstalling files. IPC remains the authority for single-instance ownership.
+    InstallerLifetime installerLifetime;
+#endif
     if(!parser.isSet("smoke-test")) {
         const auto role=instance.start(parser.isSet("trigger"));
         if(role==ws::InstanceCoordinator::Result::Forwarded) return 0;
         if(role==ws::InstanceCoordinator::Result::Failed) {QTextStream(stderr)<<instance.error()<<Qt::endl; return 2;}
+#ifdef Q_OS_WIN
+        installerLifetime.mutex=CreateMutexW(nullptr,FALSE,L"Local\\WorkSidekick.Runtime");
+        if(!installerLifetime.mutex) {QTextStream(stderr)<<"Cannot create installer lifetime marker."<<Qt::endl;return 2;}
+#endif
     }
     QSettings settings;
     auto secrets = ws::createSecretStore();

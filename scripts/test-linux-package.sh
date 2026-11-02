@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Limited Level C packaged-runtime smoke in a clean container, not a real
 # GNOME X11/Wayland desktop acceptance gate.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'echo "ERROR: package smoke host failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 package=$(realpath -- "${1:?Usage: test-linux-package.sh package.deb [evidence-dir]}")
 evidence_dir=$(realpath -m -- "${2:-$(dirname -- "$package")}")
 mkdir -p -- "$evidence_dir"
 docker run --rm -i --platform linux/amd64 \
   --mount "type=bind,source=$package,target=/package/worksidekick.deb,readonly" \
   ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11 bash -s <<'CONTAINER' 2>&1 | tee "$evidence_dir/install-uninstall.txt"
-set -euo pipefail
+set -Eeuo pipefail
+trap 'echo "ERROR: package smoke container failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 export DEBIAN_FRONTEND=noninteractive
 echo 'Environment: fresh ubuntu:22.04 amd64 container; synthetic Xvfb, not GNOME'
 cat /etc/os-release
@@ -18,15 +20,20 @@ apt-get update
 apt-get install -y --no-install-recommends /package/worksidekick.deb xvfb xauth dbus-x11 desktop-file-utils
 echo 'Resolved runtime package versions (distribution repositories, not a pinned apt snapshot):'
 dpkg-query -W -f='${binary:Package}=${Version}\n'
+echo 'Checking installed package version, architecture and absence of Qt development dependencies'
 test "$(dpkg-query -W -f='${Version}' worksidekick)" = '0.7.0~rc1'
 test "$(dpkg-query -W -f='${Architecture}' worksidekick)" = amd64
 if dpkg-query -W -f='${Status}' qt6-base-dev 2>/dev/null | grep -q 'install ok installed'; then
   echo 'Unexpected Qt development dependency in clean runtime environment' >&2; exit 1
 fi
-dpkg-query -L libqt6gui6 | grep -E '/platforms/libqxcb\.so$'
+echo 'Checking XCB platform plugin supplied by qt6-qpa-plugins'
+dpkg-query -L qt6-qpa-plugins | grep -E '/platforms/libqxcb\.so$'
+echo 'Checking Wayland platform plugins supplied by qt6-wayland'
 dpkg-query -L qt6-wayland | grep -E '/platforms/libqwayland.*\.so$'
+echo 'Checking installed binary library resolution'
 ldd /usr/bin/worksidekick | tee /tmp/worksidekick-ldd.txt
 if grep -q 'not found' /tmp/worksidekick-ldd.txt; then exit 1; fi
+echo 'Checking desktop entry, icon and packaged build metadata'
 desktop-file-validate /usr/share/applications/worksidekick.desktop
 grep -qx 'Exec=worksidekick' /usr/share/applications/worksidekick.desktop
 grep -qx 'Icon=worksidekick' /usr/share/applications/worksidekick.desktop
@@ -37,6 +44,7 @@ install -d -m 700 -o smoke -g smoke /home/smoke/runtime /home/smoke/.config/Work
 printf '%s\n' 'synthetic-settings-retention' > /home/smoke/.config/WorkSidekick/package-retention.txt
 printf '%s\n' 'synthetic-userdata-retention' > /home/smoke/.local/share/WorkSidekick/package-retention.txt
 chown -R smoke:smoke /home/smoke
+echo 'Checking installed application startup as a normal user under Xvfb'
 runuser -u smoke -- env HOME=/home/smoke \
   XDG_CONFIG_HOME=/home/smoke/.config XDG_DATA_HOME=/home/smoke/.local/share \
   XDG_RUNTIME_DIR=/home/smoke/runtime QT_QPA_PLATFORM=xcb \

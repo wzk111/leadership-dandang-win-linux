@@ -85,21 +85,54 @@ New-Item -ItemType Directory -Path $testRoot | Out-Null
 $installRoot = Join-Path $testRoot 'installed'
 $reportPath = Join-Path $artifacts 'windows-package-smoke.json'
 $writtenTargets = [System.Collections.Generic.List[string]]::new()
-$fixture = 'WorkSidekick M6 synthetic fixture, not an API key'
-$results = [ordered]@{ environment='GitHub-hosted Windows runner'; clean_machine='NOT TESTED - build runner has developer tools'; desktop='NOT TESTED - no real application acceptance'; portable='NOT TESTED'; install='NOT TESTED'; update='NOT TESTED'; uninstall='NOT TESTED'; settings='NOT TESTED'; credentials='NOT TESTED' }
-function Invoke-CheckedProcess([string]$Executable, [string[]]$Arguments) {
-    $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -WorkingDirectory $testRoot -PassThru -WindowStyle Hidden
-    if (!$process.WaitForExit(60000)) { $process.Kill(); throw "Timed out: $Executable" }
-    if ($process.ExitCode -ne 0) { throw "Process failed ($($process.ExitCode)): $Executable" }
+$ownedProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+$fixtures = @{}
+foreach ($target in $targets) { $fixtures[$target] = "WorkSidekick M6 synthetic sentinel for $target; not an API key" }
+$results = [ordered]@{ environment='GitHub-hosted Windows runner'; clean_machine='NOT TESTED - build runner has developer tools'; desktop='NOT TESTED - no real application acceptance'; portable='NOT TESTED'; helper_runtime='NOT TESTED'; install='NOT TESTED'; update='NOT TESTED'; single_instance='NOT TESTED'; running_app_uninstall='NOT TESTED'; uninstall='NOT TESTED'; settings='NOT TESTED'; credentials='NOT TESTED'; packaged_credential_read='NOT TESTED - vault retention only; native unit suite checks provider separation' }
+function Start-OwnedProcess([string]$Executable, [string[]]$Arguments = @(), [string]$StandardOutput = '') {
+    $options = @{ FilePath=$Executable; WorkingDirectory=$testRoot; PassThru=$true; WindowStyle='Hidden' }
+    if ($Arguments.Count -gt 0) { $options.ArgumentList = $Arguments }
+    if ($StandardOutput) { $options.RedirectStandardOutput = $StandardOutput }
+    $process = Start-Process @options
+    $ownedProcesses.Add($process)
+    return $process
 }
-function Invoke-CleanSmoke([string]$Directory) {
+function Stop-OwnedProcess([System.Diagnostics.Process]$Process) {
+    if (!$ownedProcesses.Contains($Process)) { throw 'Refusing to stop a process not created by this test.' }
+    if (!$Process.HasExited) { $Process.Kill(); if (!$Process.WaitForExit(10000)) { throw 'Owned process did not terminate.' } }
+}
+function Invoke-ProcessExitCode([string]$Executable, [string[]]$Arguments = @(), [int]$TimeoutMilliseconds = 60000, [string]$StandardOutput = '') {
+    $process = Start-OwnedProcess $Executable $Arguments $StandardOutput
+    if (!$process.WaitForExit($TimeoutMilliseconds)) { Stop-OwnedProcess $process; throw "Timed out: $Executable" }
+    return $process.ExitCode
+}
+function Invoke-CheckedProcess([string]$Executable, [string[]]$Arguments = @(), [int]$TimeoutMilliseconds = 60000) {
+    $code = Invoke-ProcessExitCode $Executable $Arguments $TimeoutMilliseconds
+    if ($code -ne 0) { throw "Process failed (${code}): $Executable" }
+}
+function Invoke-CleanEnvironment([scriptblock]$Action) {
     $names = @('PATH','QT_PLUGIN_PATH','QT_QPA_PLATFORM_PLUGIN_PATH','QML2_IMPORT_PATH','QML_IMPORT_PATH','QT_QPA_PLATFORM','QTDIR')
     $saved = @{}
     foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process'); [Environment]::SetEnvironmentVariable($name, $null, 'Process') }
     try {
         $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
-        Invoke-CheckedProcess (Join-Path $Directory 'worksidekick.exe') @('--smoke-test')
+        & $Action
     } finally { foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') } }
+}
+function Invoke-CleanSmoke([string]$Directory) {
+    Invoke-CleanEnvironment { Invoke-CheckedProcess (Join-Path $Directory 'worksidekick.exe') @('--smoke-test') }
+}
+function Assert-PrimaryReady([System.Diagnostics.Process]$Primary) {
+    $deadline = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($deadline.ElapsedMilliseconds -lt 15000) {
+        if ($Primary.HasExited) { throw "Installed primary exited during startup ($($Primary.ExitCode))." }
+        try {
+            $mutex = [System.Threading.Mutex]::OpenExisting('Local\WorkSidekick.Runtime')
+            $mutex.Dispose()
+            return
+        } catch [System.Threading.WaitHandleCannotBeOpenedException] { Start-Sleep -Milliseconds 100 }
+    }
+    throw 'Installed primary did not expose its runtime mutex.'
 }
 function Assert-Fixtures {
     foreach ($entry in $settingFixtures) {
@@ -107,7 +140,7 @@ function Assert-Fixtures {
         if ($value -ne $entry[2]) { throw "Setting did not persist: $($entry[0])/$($entry[1])" }
     }
     foreach ($target in $writtenTargets) {
-        if ([PackageCredentialFixture]::Read($target) -ne $fixture) { throw 'Synthetic credential did not persist.' }
+        if ([PackageCredentialFixture]::Read($target) -ne $fixtures[$target]) { throw 'Provider-specific synthetic vault value did not persist.' }
     }
 }
 function Assert-InstalledPayload {
@@ -125,7 +158,7 @@ $settingFixtures = @(
     @('ui','automaticPopup','false'), @('shortcut','enabled','false')
 )
 try {
-    foreach ($target in $targets) { [PackageCredentialFixture]::Write($target, $fixture); $writtenTargets.Add($target) }
+    foreach ($target in $targets) { [PackageCredentialFixture]::Write($target, $fixtures[$target]); $writtenTargets.Add($target) }
     foreach ($entry in $settingFixtures) {
         New-Item -Path "$settingsKey\$($entry[0])" -Force | Out-Null
         New-ItemProperty -LiteralPath "$settingsKey\$($entry[0])" -Name $entry[1] -Value $entry[2] -PropertyType String -Force | Out-Null
@@ -137,6 +170,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Extracted portable package audit failed' }
     Invoke-CleanSmoke $portableRoot
     $results.portable = 'PASS - extracted ZIP, clean PATH and Qt environment'
+    $workerOutput = Join-Path $testRoot 'uia-worker-invalid-arguments.json'
+    $workerExit = Invoke-CleanEnvironment { Invoke-ProcessExitCode (Join-Path $portableRoot 'worksidekick_uia_worker.exe') @() 10000 $workerOutput }
+    if ($workerExit -ne 0) { throw "Packaged UIA worker runtime failed: $workerExit" }
+    $workerReply = Get-Content -LiteralPath $workerOutput -Raw | ConvertFrom-Json
+    if ($workerReply.initialized -ne $false -or $workerReply.reason -ne 'invalid arguments') { throw 'Unexpected no-arguments UIA worker response.' }
+    $results.helper_runtime = 'PASS - clean-environment helper starts and returns bounded invalid-arguments JSON; real UIA NOT TESTED'
     $initialInstaller = if ($PreviousInstallerPath) { (Resolve-Path -LiteralPath $PreviousInstallerPath).Path } else { $installer }
     Invoke-CheckedProcess $initialInstaller @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=`"$installRoot`"",'/TASKS=',"/LOG=`"$testRoot\install.log`"")
     if (!(Test-Path -LiteralPath $uninstallKey)) { throw 'Per-user uninstall registration missing' }
@@ -151,15 +190,36 @@ try {
     Assert-Fixtures
     $results.update = if ($PreviousInstallerPath) { 'PASS - supplied previous installer to candidate' } else { 'PASS - same-version reinstall only; previous-version upgrade NOT TESTED' }
     $results.settings = 'PASS - provider/model, Profile, feature and shortcut preferences retained'
-    $results.credentials = 'PASS - four synthetic provider credentials retained'
+    $results.credentials = 'PASS - four distinct provider sentinel values retained in Windows vault; packaged app read NOT TESTED'
+    $primary = Invoke-CleanEnvironment { Start-OwnedProcess (Join-Path $installRoot 'worksidekick.exe') }
+    Assert-PrimaryReady $primary
+    Invoke-CleanEnvironment {
+        foreach ($iteration in 1..20) { Invoke-CheckedProcess (Join-Path $installRoot 'worksidekick.exe') @('--trigger') 10000 }
+        Invoke-CheckedProcess (Join-Path $installRoot 'worksidekick.exe') @() 10000
+    }
+    if ($primary.HasExited) { throw 'Primary exited during second-instance forwarding.' }
+    $runningApps = @(Get-Process worksidekick -ErrorAction SilentlyContinue)
+    if ($runningApps.Count -ne 1 -or $runningApps[0].Id -ne $primary.Id) { throw 'Forwarding left a duplicate app process.' }
+    $results.single_instance = 'PASS - installed normal primary, 20 --trigger calls and second normal launch forward and exit; one primary remains'
+    $blockedUninstall = Invoke-ProcessExitCode (Join-Path $installRoot 'unins000.exe') @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=`"$testRoot\uninstall-running.log`"")
+    if ($blockedUninstall -eq 0 -or $primary.HasExited -or !(Test-Path -LiteralPath $uninstallKey)) {
+        throw 'Running-app uninstall was not safely refused.'
+    }
+    Assert-InstalledPayload
+    $results.running_app_uninstall = 'PASS - AppMutex blocks silent uninstall with nonzero exit, payload and owned primary preserved'
+    Stop-OwnedProcess $primary
     Invoke-CheckedProcess (Join-Path $installRoot 'unins000.exe') @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=`"$testRoot\uninstall.log`"")
     if ((Test-Path -LiteralPath (Join-Path $installRoot 'worksidekick.exe')) -or (Test-Path -LiteralPath $uninstallKey) -or (Test-Path -LiteralPath $shortcut)) {
         throw 'Uninstall left program, registration or Start Menu shortcut behind'
+    }
+    foreach ($entry in (Get-Content -LiteralPath (Join-Path $artifacts 'windows-package-manifest.json') -Raw | ConvertFrom-Json)) {
+        if (Test-Path -LiteralPath (Join-Path $installRoot $entry.path)) { throw "Manifest payload survived uninstall: $($entry.path)" }
     }
     Assert-Fixtures
     $results.uninstall = 'PASS - program/registration/shortcut removed, user settings/credentials retained'
     if (Get-Process worksidekick,worksidekick_uia_worker -ErrorAction SilentlyContinue) { throw 'Packaged launch left an app/helper process behind.' }
 } finally {
+    foreach ($process in $ownedProcesses) { Stop-OwnedProcess $process }
     $results | ConvertTo-Json | Set-Content -LiteralPath $reportPath -Encoding utf8
     foreach ($target in $writtenTargets) { [PackageCredentialFixture]::Delete($target) }
     # Only this previously absent key was created by this disposable-runner test.

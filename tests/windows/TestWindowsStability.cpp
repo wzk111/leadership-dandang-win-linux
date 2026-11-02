@@ -100,6 +100,7 @@ private slots:
             drain();QCOMPARE(done.size(),0);if(cycle%2==0)sample("synthetic_uia_worker",cycle);
         }
         HANDLE childHandle=nullptr;
+        struct CloseChild {HANDLE& handle;~CloseChild(){if(handle)CloseHandle(handle);}} closeChild{childHandle};
         {
             auto pending=std::make_unique<UIAQuery>(nullptr,QCoreApplication::applicationFilePath(),30000);
             QVERIFY(pending->request(1));
@@ -111,7 +112,6 @@ private slots:
             childHandle=OpenProcess(SYNCHRONIZE,FALSE,DWORD(pid));QVERIFY(childHandle);
             QElapsedTimer shutdown;shutdown.start();pending.reset();QVERIFY(shutdown.elapsed()<2000);
         }
-        struct CloseChild {HANDLE handle;~CloseChild(){if(handle)CloseHandle(handle);}} closeChild{childHandle};
         QTRY_COMPARE_WITH_TIMEOUT(WaitForSingleObject(childHandle,0),DWORD(WAIT_OBJECT_0),3000);
         qInfo()<<"M6 synthetic_UIA timeout=10 cancellation=10 recovery=10 pending_shutdown=1; timeout heartbeat responsive; helpers reaped; native provider hang acceptance NOT TESTED";
     }

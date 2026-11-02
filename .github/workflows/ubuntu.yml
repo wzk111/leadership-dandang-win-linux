@@ -56,3 +56,9 @@ jobs:
             dist/linux/*.txt
             dist/linux/package-manifest.json
           if-no-files-found: warn
+      - name: Upload Ubuntu test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-native-test-evidence
+          path: build/Testing/Temporary/LastTest.log

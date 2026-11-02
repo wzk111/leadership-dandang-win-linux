@@ -10,8 +10,9 @@ Run the installer normally to install into
 `%LOCALAPPDATA%\Programs\WorkSidekick`. It creates a Start Menu shortcut and
 offers a desktop shortcut (unchecked by default). It requests no administrator
 privileges, installs no service or task, and enables no autostart entry. Close
-WorkSidekick before upgrading; the installer also uses Windows Restart Manager
-to detect files in use. Its AppId remains stable across versions. Upgrade keeps
+WorkSidekick before upgrading or uninstalling; a runtime mutex safely refuses
+those operations while the primary app is running. The installer also uses
+Windows Restart Manager to detect files in use. Its AppId remains stable across versions. Upgrade keeps
 settings and credentials. No automatic relaunch occurs after setup.
 
 Uninstall from Windows Settings > Apps. Uninstall removes program files,
@@ -26,8 +27,8 @@ Never delete unrelated credentials.
 ## Build
 
 From the repository root in an MSVC 2022 x64 developer PowerShell, with Qt
-**6.8.3 MSVC 2022 x64** on PATH, Python 3, CMake and a preinstalled **Inno Setup 6.3
-or later in major version 6**:
+**6.8.3 MSVC 2022 x64** on PATH, Python 3, CMake and a preinstalled **Inno Setup
+6.7.0**:
 
 ```powershell
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -36,11 +37,19 @@ ctest --test-dir build --output-on-failure
 ./scripts/package-windows.ps1 -BuildDirectory build -ArtifactDirectory build/packages -Version 0.7.0-rc1
 ```
 
-`ArtifactDirectory` must be empty. The script does not download or run a runtime
-installer. `-InnoCompiler` can point to an existing `ISCC.exe`. CI uses the Inno
-Setup already installed in the `windows-2022` runner image and records its actual
-version and runner image version in `build-metadata.json`. This is a documented
-runner-provided tool dependency, not a claim of a fully pinned binary toolchain.
+`ArtifactDirectory` must be empty. Packaging reconfigures the current checkout
+as Release and rebuilds only `worksidekick` and `worksidekick_uia_worker` plus
+their dependencies. It verifies the cached MSVC x64 configuration and actual
+PE architecture, and records the compiler selected by CMake. The script does not download or run a runtime
+installer. `-InnoCompiler` can point to an existing 6.7.0 `ISCC.exe`. CI downloads
+the [official Inno Setup 6.7.0 release](https://github.com/jrsoftware/issrc/releases/tag/is-6_7_0)
+to the runner temporary directory and checks SHA-256
+`f45c7d68d1e660cf13877ec36738a5179ce72a33414f9959d35e99b68c52a697`
+before executing the installer. Installation is per-user, bounded and hidden;
+CI passes the exact installed compiler path. The package script verifies the
+compiler's ProductVersion and records its actual version and runner image
+version in `build-metadata.json`. The package script never downloads installers
+itself. Other runner build tools are recorded, not claimed fully pinned.
 
 `windeployqt` runs only against the app and UIA worker in a new product stage.
 `--no-compiler-runtime` prevents bundling a redistributable EXE. App-local DLLs
@@ -74,8 +83,15 @@ Only on a disposable GitHub-hosted Windows runner:
 
 This checks hashes, audits the extracted ZIP, removes development paths and Qt
 environment overrides for launch, then installs, reinstalls, launches and
-uninstalls. It checks synthetic provider/model, Profile, feature, automatic
-toolbar, shortcut preferences and four synthetic vault entries remain intact.
+uninstalls. It verifies the helper's no-argument JSON response, launches the
+installed normal primary, forwards 20 `--trigger` invocations and a second
+normal launch, and verifies running-app uninstall is safely refused. After
+stopping only its own primary, it verifies every manifest file is removed.
+It checks synthetic provider/model, Profile, feature, automatic toolbar,
+shortcut preferences and four distinct synthetic provider vault values remain
+intact. Vault retention is checked through Windows APIs; a packaged-app
+credential read is NOT TESTED. Provider access isolation is covered by the
+separate native unit suite, not inferred from package retention checks.
 It refuses to start if existing product settings, credentials, registration or
 processes are found. It removes only its synthetic data after the test.
 

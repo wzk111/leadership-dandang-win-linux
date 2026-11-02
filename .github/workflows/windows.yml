@@ -41,9 +41,26 @@ jobs:
         run: |
           $process = Start-Process -FilePath .\build\worksidekick.exe -ArgumentList '--smoke-test' -PassThru -Wait -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { throw "Launch smoke failed: $($process.ExitCode)" }
+      - name: Install verified Inno Setup 6.7.0 in runner temporary directory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.0.exe'
+          $innoRoot = Join-Path $env:RUNNER_TEMP 'inno6.7.0'
+          Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_0/innosetup-6.7.0.exe' -OutFile $setup
+          $expected = 'f45c7d68d1e660cf13877ec36738a5179ce72a33414f9959d35e99b68c52a697'
+          if ((Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'Inno Setup download SHA-256 mismatch; refusing to execute.' }
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/CURRENTUSER',"/DIR=`"$innoRoot`"") -PassThru -WindowStyle Hidden
+          if (!$process.WaitForExit(60000)) { $process.Kill(); throw 'Inno Setup installation timed out.' }
+          if ($process.ExitCode -ne 0) { throw "Inno Setup installation failed: $($process.ExitCode)" }
+          $compiler = Join-Path $innoRoot 'ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler -PathType Leaf)) { throw 'Verified Inno Setup compiler was not installed.' }
+          (Get-Item -LiteralPath $compiler).VersionInfo | Format-List FileVersion,ProductVersion
       - name: Product portable ZIP and per-user installer
         shell: pwsh
-        run: ./scripts/package-windows.ps1 -BuildDirectory build -ArtifactDirectory build/packages -Version 0.7.0-rc1
+        run: ./scripts/package-windows.ps1 -BuildDirectory build -ArtifactDirectory build/packages -Version 0.7.0-rc1 -InnoCompiler (Join-Path $env:RUNNER_TEMP 'inno6.7.0/ISCC.exe')
+      - name: Package audit regression tests
+        run: python tests/test_package_audit.py
       - name: Product portable and installer lifecycle smoke
         shell: pwsh
         run: ./scripts/test-windows-package.ps1 -ArtifactDirectory build/packages -Version 0.7.0-rc1

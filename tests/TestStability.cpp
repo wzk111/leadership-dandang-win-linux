@@ -1,9 +1,12 @@
 #include <QtTest>
 #include <QApplication>
 #include <QDir>
+#include <QEvent>
 #include <QFile>
 #include <QLocalSocket>
+#include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QPointer>
 #include <QProcess>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -61,8 +64,9 @@ void drainDeletes() { QCoreApplication::sendPostedEvents(nullptr,QEvent::Deferre
 
 class SyntheticSecret final : public ISecretStore {
 public:
-    int reads=0;
-    bool read() override {++reads;QTimer::singleShot(0,this,[this]{emit readFinished({"synthetic-key",{}});});return true;}
+    int reads=0;bool deferReads=false;
+    bool read() override {++reads;if(!deferReads)QTimer::singleShot(0,this,[this]{finishRead();});return true;}
+    void finishRead() {emit readFinished({"synthetic-key",{}});}
     bool save(const QString&) override {return false;}
     bool remove() override {return false;}
     bool busy() const override {return false;}
@@ -137,6 +141,38 @@ public:
     }
     QUrl endpoint(const QString& suffix) const {return QUrl(QString("http://127.0.0.1:%1/v1/%2").arg(serverPort()).arg(suffix));}
 };
+// HttpAIProvider owns a parentless QNetworkAccessManager member, so searching
+// the provider's descendants cannot observe its replies. Capture manager child
+// lifetimes without changing production ownership or exposing its private API.
+class ReplyLifetimeProbe final : public QObject {
+    struct Child {QPointer<QObject> object;bool reply=false;};
+    QList<Child> children_;
+    void identifyReplies() {
+        for(auto& child:children_)if(child.object && qobject_cast<QNetworkReply*>(child.object.data()))child.reply=true;
+    }
+public:
+    ReplyLifetimeProbe() {qApp->installEventFilter(this);}
+    ~ReplyLifetimeProbe() override {qApp->removeEventFilter(this);}
+    int createdReplies() {identifyReplies();int count=0;for(const auto& child:children_)if(child.reply)++count;return count;}
+    int liveReplies() {identifyReplies();int count=0;for(const auto& child:children_)if(child.reply && child.object)++count;return count;}
+    QPointer<QObject> lastReply() {
+        identifyReplies();for(auto it=children_.crbegin();it!=children_.crend();++it)if(it->reply)return it->object;return {};
+    }
+protected:
+    bool eventFilter(QObject* receiver,QEvent* event) override {
+        if(event->type()==QEvent::ChildAdded && qobject_cast<QNetworkAccessManager*>(receiver)) {
+            // ChildAdded can arrive during QObject's base constructor: defer
+            // type identification until the child is fully constructed.
+            children_.append({static_cast<QChildEvent*>(event)->child(),false});
+        }
+        // A very fast success can finish and deleteLater in one event-loop turn.
+        // Identify it before DeferredDelete is delivered, while the dynamic type
+        // and captured QPointer are still valid; after delivery the pointer clears.
+        if(event->type()==QEvent::DeferredDelete && qobject_cast<QNetworkReply*>(receiver))
+            for(auto& child:children_)if(child.object==receiver)child.reply=true;
+        return false;
+    }
+};
 std::unique_ptr<IAIProvider> provider(const QString& id,CancellationServer& server) {
     if(id=="anthropic")return std::make_unique<AnthropicProvider>(nullptr,server.endpoint("messages"),5000);
     if(id=="gemini")return std::make_unique<GeminiProvider>(nullptr,server.endpoint("interactions"),5000);
@@ -177,7 +213,7 @@ private slots:
         auto* bar=window<ActionBar>();auto* palette=window<ManualActionPalette>();QVERIFY(bar);QVERIFY(palette);
         for(int i=0;i<10;++i){monitor.detect(i);monitor.clear();emit shortcut.activated();palette->close();}
         drainDeletes();const int initialReads=resolver.reads;resources("simulated_ui",0);
-        QList<qint64> latencies;
+        QList<qint64> latencies,manualLatencies;
         for(int cycle=1;cycle<=500;++cycle) {
             QElapsedTimer timer;timer.start();monitor.detect(cycle*2);QVERIFY(bar->isVisible());
             latencies<<timer.nsecsElapsed();
@@ -188,17 +224,28 @@ private slots:
             if(cycle%100==0){drainDeletes();resources("simulated_ui",cycle);}
         }
         for(int cycle=1;cycle<=200;++cycle) {
+            QElapsedTimer timer;timer.start();
             emit shortcut.activated();QVERIFY(palette->isVisible());QVERIFY(palette->currentSelection());
+            manualLatencies<<timer.nsecsElapsed();
             palette->close();QVERIFY(!palette->isVisible());
             if(cycle%50==0){drainDeletes();resources("simulated_shortcut_palette",cycle);}
         }
         QCOMPARE(resolver.reads-initialReads,200);
+        // Opening the composer is an explicit local step, and still must not
+        // read credentials or upload until Generate Reply is chosen.
+        QVERIFY(controller.runSelection(Feature::Reply,{"Synthetic incoming message.",{},"fixture"}));
+        auto* composer=window<ReplyComposer>();QVERIFY(composer);QVERIFY(composer->isVisible());QVERIFY(composer->currentSelection());
+        drainDeletes();QCOMPARE(server.requests,0);QCOMPARE(secret.reads,0);QVERIFY(!controller.busy());
+        composer->close();QVERIFY(!composer->isVisible());QVERIFY(!composer->currentSelection());
         for(int i=0;i<100;++i){monitor.stop();QVERIFY(!monitor.status().running);QVERIFY(monitor.start());}
         QCoreApplication::processEvents();QCOMPARE(server.requests,0);QCOMPARE(secret.reads,0);QVERIFY(!controller.busy());
         std::sort(latencies.begin(),latencies.end());
+        std::sort(manualLatencies.begin(),manualLatencies.end());
         qInfo()<<"M6 simulated provider"<<id<<"counts selection_events=1000 actionbar_cycles=500 shortcut_activations=200 palette_cycles=200 monitor_restarts=100 HTTP=0"
             <<"selection-to-visible p95_ns"<<latencies[474]<<"samples"<<latencies.size()
-            <<"boundary=direct fixture signal through Application; excludes native provider and window manager";
+            <<"shortcut-to-palette p95_ns"<<manualLatencies[189]<<"samples"<<manualLatencies.size()
+            <<"reply_composer_open=1 HTTP=0"
+            <<"boundary=direct fixture signal through Application and synchronous synthetic resolver; excludes native input/provider and window manager";
         resources("simulated_ui_final",500);
     }
     void syntheticHttpCancellation_data() {
@@ -207,6 +254,7 @@ private slots:
     }
     void syntheticHttpCancellation() {
         QFETCH(QString,id);CancellationServer server;QVERIFY(server.listen(QHostAddress::LocalHost));auto ai=provider(id,server);
+        ReplyLifetimeProbe replies;
         SyntheticSecret secret;SyntheticSelection selection;QTemporaryDir dir;QVERIFY(dir.isValid());
         QSettings settings(dir.filePath("settings.ini"),QSettings::IniFormat);
         Settings config;config.model="synthetic-model";config.providerId=id;
@@ -219,12 +267,15 @@ private slots:
             const int requests=server.requests;
             QVERIFY(controller.runSelection(Feature::Summarize,{"Synthetic cancellation selection.",{},"fixture"}));
             QTRY_COMPARE_WITH_TIMEOUT(server.requests,requests+1,3000);
+            QCOMPARE(replies.createdReplies(),cycle+1);QCOMPARE(replies.liveReplies(),1);
+            const auto reply=replies.lastReply();QVERIFY(reply);QVERIFY(qobject_cast<QNetworkReply*>(reply.data()));
             QVERIFY(controller.busy());QVERIFY(cancel->isEnabled());cancel->click();
             QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,3000);
             QCOMPARE(qvariant_cast<AIResult>(finished.takeFirst()[0]).error,AIError::Cancelled);
             QVERIFY(!controller.busy());QVERIFY(!ai->busy());QVERIFY(!cancel->isEnabled());
             QTRY_VERIFY_WITH_TIMEOUT(server.findChildren<QTcpSocket*>().isEmpty(),3000);
-            drainDeletes();QCOMPARE(ai->findChildren<QNetworkReply*>().size(),0);
+            QTRY_VERIFY_WITH_TIMEOUT(reply.isNull(),3000);
+            drainDeletes();QCOMPARE(replies.liveReplies(),0);
             if(cycle==0 || cycle%5==0)resources(qPrintable(id),cycle);
         }
         QCOMPARE(server.requests,26);QCOMPARE(secret.reads,26);
@@ -236,8 +287,53 @@ private slots:
         QCOMPARE(qvariant_cast<AIResult>(finished.takeFirst()[0]).error,AIError::None);QVERIFY(!controller.busy());
         QCOMPARE(server.requests,27);QCOMPARE(secret.reads,27);
         QTRY_VERIFY_WITH_TIMEOUT(server.findChildren<QTcpSocket*>().isEmpty(),3000);
-        drainDeletes();QCOMPARE(ai->findChildren<QNetworkReply*>().size(),0);
+        QTRY_COMPARE_WITH_TIMEOUT(replies.createdReplies(),27,3000);
+        QTRY_COMPARE_WITH_TIMEOUT(replies.liveReplies(),0,3000);
+        drainDeletes();
         qInfo()<<"M6 HTTP cancellation provider"<<id<<"measured=25 warmup=1 boundary=ResultCard Cancel to AppController to real loopback HTTP abort";
+    }
+    void pendingRequestAboutToQuit_data() {
+        QTest::addColumn<QString>("id");QTest::addColumn<bool>("httpPending");
+        for(const auto* id:{"openai","anthropic","gemini","openai_compatible"}) {
+            QTest::newRow(qPrintable(QString(id)+"-pending-secret"))<<QString(id)<<false;
+            QTest::newRow(qPrintable(QString(id)+"-pending-http"))<<QString(id)<<true;
+        }
+    }
+    void pendingRequestAboutToQuit() {
+        QFETCH(QString,id);QFETCH(bool,httpPending);
+        CancellationServer server;QVERIFY(server.listen(QHostAddress::LocalHost));auto ai=provider(id,server);
+        ReplyLifetimeProbe replies;SyntheticSecret secret;secret.deferReads=true;SyntheticSelection selection;
+        QTemporaryDir dir;QVERIFY(dir.isValid());QSettings settings(dir.filePath("settings.ini"),QSettings::IniFormat);
+        Settings config;config.model="synthetic-model";config.providerId=id;config.baseUrl=server.endpoint("").toString();QVERIFY(config.save(settings));
+        AppController controller(*ai,secret,selection,settings);Application app(controller,secret,settings);app.start(false);
+        QApplication::setQuitOnLastWindowClosed(false);
+        QSignalSpy finished(&controller,&AppController::finished);
+        QVERIFY(controller.runSelection(Feature::Summarize,{"Synthetic shutdown selection.",{},"fixture"}));
+        QVERIFY(controller.busy());QCOMPARE(secret.reads,1);QCOMPARE(server.requests,0);
+        QPointer<QObject> reply;
+        if(httpPending) {
+            secret.finishRead();QTRY_COMPARE_WITH_TIMEOUT(server.requests,1,3000);
+            QCOMPARE(replies.createdReplies(),1);reply=replies.lastReply();QVERIFY(reply);
+            QVERIFY(qobject_cast<QNetworkReply*>(reply.data()));QVERIFY(ai->busy());
+        } else {QVERIFY(!ai->busy());QCOMPARE(replies.createdReplies(),0);}
+        // Emit the real application shutdown signal without quitting the test
+        // process; production Application's connection must cancel the controller.
+        QElapsedTimer cleanup;cleanup.start();
+        QVERIFY(QMetaObject::invokeMethod(qApp,"aboutToQuit",Qt::DirectConnection));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,2000);
+        QCOMPARE(qvariant_cast<AIResult>(finished[0][0]).error,AIError::Cancelled);
+        QVERIFY(!controller.busy());QVERIFY(!ai->busy());
+        if(httpPending)QTRY_VERIFY_WITH_TIMEOUT(reply.isNull(),2000);
+        QTRY_VERIFY_WITH_TIMEOUT(server.findChildren<QTcpSocket*>().isEmpty(),2000);
+        QVERIFY(cleanup.elapsed()<2000);
+        // A delayed secret callback after shutdown must not generate a new
+        // request or deliver a second completion, in either pending phase.
+        secret.finishRead();drainDeletes();
+        QCOMPARE(finished.size(),1);QCOMPARE(secret.reads,1);QCOMPARE(server.requests,httpPending?1:0);
+        QCOMPARE(replies.createdReplies(),httpPending?1:0);QCOMPARE(replies.liveReplies(),0);
+        QVERIFY(!controller.busy());QVERIFY(!ai->busy());
+        qInfo()<<"M6 shutdown provider"<<id<<"pending_phase"<<(httpPending?"HTTP":"secret")
+            <<"cleanup_ms"<<cleanup.elapsed()<<"late_secret_ignored=1 boundary=aboutToQuit signal through production Application connection; full process exit excluded";
     }
     void ipcStartupRacesAndRestarts() {
         QTemporaryDir dir;QVERIFY(dir.isValid());const auto ipc=dir.filePath("ipc");

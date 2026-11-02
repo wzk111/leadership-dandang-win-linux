@@ -28,6 +28,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\worksidekick.exe
+AppMutex=Local\WorkSidekick.Runtime
 CloseApplications=yes
 CloseApplicationsFilter=worksidekick.exe,worksidekick_uia_worker.exe,*.dll
 RestartApplications=no
