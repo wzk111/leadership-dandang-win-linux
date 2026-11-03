@@ -24,32 +24,34 @@ exists. Native desktop and clean-machine delivery are separate acceptance gates.
 ## Tasks and verification
 
 - [x] Preserve the supplied specification; verify baseline and inventory architecture.
-- [ ] Windows delivery: `packaging/windows/`, `scripts/package-windows.ps1`,
+- [x] Windows delivery: `packaging/windows/`, `scripts/package-windows.ps1`,
   `.github/workflows/windows.yml`. Stage only app/helper; windeployqt and app-local
   MSVC runtime; Inno Setup per-user installer, stable AppId, optional desktop
   shortcut, no autostart. Smoke extracted/installed app with clean PATH; verify
-  upgrade preserves isolated settings; uninstall removes program only.
-- [ ] Ubuntu delivery: `packaging/linux/`, `scripts/package-linux.sh`,
+  same-version reinstall preserves isolated settings; uninstall removes program
+  only. Previous packaged-version upgrade remains NOT TESTED.
+- [x] Ubuntu delivery: `packaging/linux/`, `scripts/package-linux.sh`,
   `.github/workflows/ubuntu.yml`. CPack DEB with shlibdeps, desktop/icon/docs,
   explicit plugin dependencies; inspect manifest and install/remove in fresh
   Ubuntu 22.04 container, with user-owned configuration retained.
-- [ ] Shared package security: manifest audit rejects test binaries, secrets,
+- [x] Shared package security: manifest audit rejects test binaries, secrets,
   debug/build/dev files; SHA256SUMS and build metadata identify exact commit and
   tools. Include license/dependency inventory and redistribution guidance.
-- [ ] Stability: `tests/TestStability.cpp`, platform stress tests and scripts.
+- [x] Stability: `tests/TestStability.cpp`, platform stress tests and scripts.
   Exercise 1000 selections, 500 bars, 200 activations, 100 monitor/shortcut
   restarts, palettes, synthetic HTTP cancellations and IPC races. Sample resources
   after warmup and batches; retain actual counts and distinguish mocks/native.
-- [ ] Recovery: verify existing UIA timeout/cancel/shutdown/recovery tests and
-  AT-SPI loss/stop coverage; only fix reproduced defects with regression tests.
-- [ ] Version and UX: set CMake/runtime 0.7.0; reuse normal workspace as GNOME
+- [x] Recovery: UIA timeout/cancel/shutdown/recovery and AT-SPI stop/stale-result
+  coverage verified. AT-SPI failed initialization needs restart; real bus-loss
+  and target-exit recovery remain NOT TESTED and are documented.
+- [x] Version and UX: set CMake/runtime 0.7.0; reuse normal workspace as GNOME
   tray fallback; concise first-run instructions without automatic requests.
-- [ ] Release orchestration: `.github/workflows/release.yml`, explicit manual/tag
+- [x] Release orchestration: `.github/workflows/release.yml`, explicit manual/tag
   builds and artifact summary only, never automatic GitHub Release publication.
-- [ ] Run preserved Windows/Ubuntu CI, download actual artifacts, inspect hashes
+- [x] Run preserved Windows/Ubuntu CI, download actual artifacts, inspect hashes
   and local package/native tests. Native desktop work uses only synthetic text
   in owned test documents; unavailable environments are NOT TESTED.
-- [ ] Spec review then quality review, resolve findings, publish concise completion,
+- [x] Spec review then quality review, resolve findings, publish concise completion,
   desktop, stability, packaging and checklist reports. Record exact tested SHA,
   actual CI URLs, artifact paths/checksums, missing evidence and M6 gate. Stop at M6.
 

@@ -1,7 +1,10 @@
 # M6 packaging report
 
 Candidate: `0.7.0-rc1`, unsigned. This document distinguishes actual packages from
-the separate developer/native-test bundle. See completion report for final CI SHA.
+the separate developer/native-test bundle. Final source is `e672f9f`, with all
+jobs passing in [candidate run 41647138067](https://github.com/wzk111/leadership-dandang-win-linux/actions/runs/41647138067).
+See [completion report](m6-completion.md) for exact artifact links, hashes and
+locally verified downloads. Both final platform package smokes passed.
 
 ## Ubuntu DEB — verified delivery smoke
 
@@ -41,8 +44,19 @@ sudo apt remove worksidekick
 ```
 
 Only installation/removal needs root. Launch the app as your desktop user.
-Previous-version upgrade, real packaged Secret Service access, GNOME launcher
-activation/tray and native Wayland launch remain NOT TESTED.
+Previous-version upgrade, GNOME launcher activation/tray and native Wayland launch
+remain NOT TESTED.
+
+The latest harness additionally mounts an external test-only state probe, never
+included in the DEB. It uses the installed runtime and a normal isolated account
+with a controlled Secret Service, checks production QSettings/Profile/preferences,
+reads four distinct provider adapter values and verifies provider deletion
+isolation. It restarts the isolated keyring on a new bus after removal and checks
+the same settings and secrets again. Existing settings are rejected before any
+seed write, and the harness verifies the refusal preserves their bytes. This is
+adapter evidence, not a main-executable AI request. These checks passed in
+[Ubuntu run 41644121055](https://github.com/wzk111/leadership-dandang-win-linux/actions/runs/41644121055)
+at `f98a8fd`; the final candidate run is recorded in the completion report.
 
 ## Windows ZIP and installer
 
@@ -66,10 +80,30 @@ refusal, same-version reinstall, full-manifest removal and distinct synthetic
 settings/vault-value retention. It refuses existing user data and only runs in a
 disposable hosted account. It does not claim the packaged app itself read keys.
 
-Windows package creation/installation final evidence: **NOT TESTED — pending the
-currently running corrected CI**. This status must be updated from actual artifacts
-before delivery. Previous-version upgrade and clean Windows machine remain
-NOT TESTED; M5 supplied no predecessor installer. Code signing NOT CONFIGURED.
+The external test-only probe reads production QSettings and four distinct native
+provider adapters with installed Qt DLLs. No test/probe is installed. A preliminary
+Windows lifecycle run correctly refused an existing registry key created by the
+earlier developer startup smoke. CI now performs product account verification
+before that smoke; the refusal guard was preserved rather than deleting unknown
+data. Product ZIP creation and local Windows 11 clean-PATH startup already passed
+at `e578af6`; final install/reinstall/uninstall results follow below.
+
+Windows product creation and complete hosted-account lifecycle passed in
+[package retest 41646289012](https://github.com/wzk111/leadership-dandang-win-linux/actions/runs/41646289012),
+with product/probe artifacts from source `d3e7376` and corrected harness `d6254be`.
+The manual `windows-package-retest.yml` workflow downloads only this repository's
+artifacts into a fresh account and copies only the probe EXE into an empty folder,
+so developer DLLs cannot shadow installed Qt. It records both provenances and
+does not relabel the result as a new candidate build. The final same-source
+candidate build is linked in the completion report.
+
+The test caught a fixture error: repeated `New-Item -Force` on the same registry
+group erased earlier fields. A temporary unique-key reproduction confirmed the
+behavior; seeding now creates missing groups only and checks all values before
+the first product launch. Both fixes retain the existing-data refusal guards.
+
+Previous-version upgrade and clean Windows machine remain NOT TESTED; M5 supplied
+no predecessor installer. Code signing NOT CONFIGURED.
 
 ## Provenance, security and licenses
 
@@ -78,6 +112,10 @@ resolves one immutable commit for both platforms and only uploads candidate
 artifacts; it does not publish a GitHub Release. Qt patch versions and Inno are
 pinned; compiler/runner/system package resolutions are recorded. Ubuntu apt is not
 a frozen repository snapshot. Byte-for-byte reproducibility is NOT TESTED.
+Windows checksum files explicitly use LF; the strict Linux aggregator also
+accepts older CRLF manifests. All final product and Windows metadata checksums
+passed in CI and after download. The final Windows portable package also passed
+local Windows 11 clean-environment smoke, with no remaining app/helper processes.
 
 The package audit rejects obvious secret/development/fixture/private-directory
 paths and is regression-tested. This is not a general secret-content certification.

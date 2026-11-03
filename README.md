@@ -6,7 +6,7 @@ adds packaging and stabilization to the Windows/Linux native backends, retaining
 local Profile, result refinements, and four provider choices. Review results and
 copy them yourself. Selecting text never sends an AI request.
 
-**Targets:** Ubuntu 22.04 LTS and Windows x64 (MSVC / Qt 6).
+**Targets:** Ubuntu 22.04 LTS and Windows 11 x64 (MSVC / Qt 6).
 This is an independent implementation inspired by
 [leadership-dandang](https://github.com/SecondServ/leadership-dandang); its source
 code was not copied. The original requirements are preserved in
@@ -267,10 +267,12 @@ native AT-SPI metadata is shown in the selection panel.
 - **M3:** explicit AT-SPI / PRIMARY / clipboard fallback, global shortcut and --trigger.
 - **M4:** reply/profile/features and additional AI providers.
 - **M5:** native Windows integrations.
+- **M6:** delivery packages, lifecycle stress and documented desktop acceptance.
 
 M2 automatic popup and M3 manual actions coexist. PRIMARY is read only after explicit trigger on Qt xcb. Manual clipboard mode remains available on either X11 or Wayland.
-No GNOME settings are changed. Windows CMake configurations expose shared library/test targets, but Windows
-builds are NOT TESTED. M0 does not produce a native Windows application.
+No GNOME settings are changed. Both Windows and Ubuntu Release builds and native
+adapter tests run in CI. Real desktop and clean-machine acceptance have separate
+evidence gates in the [M6 completion report](docs/m6-completion.md).
 
 ## Tests
 
@@ -312,6 +314,7 @@ each provider's data policies apply. The app never sends messages, scrapes apps,
 records clipboard history or monitors general input.
 
 - [Architecture](docs/architecture.md)
+- [M6 completion](docs/m6-completion.md)
 - [Privacy](docs/privacy.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Linux compatibility](docs/linux-selection-compatibility.md)

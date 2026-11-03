@@ -12,14 +12,18 @@ This is an evidence checklist, not authorization to publish a production release
 - [x] Real Notepad/Chrome selection, automatic toolbar appearance and manual Reply paths observed.
 - [x] Real Chrome keyboard UIA and explicit clipboard fallback observed.
 - [x] Physical two-monitor 100% setup including negative Y validated with native policy tests.
-- [ ] Windows product ZIP/installer generation and lifecycle final CI evidence pending.
-- [ ] Candidate release workflow end-to-end execution pending.
+- [x] Windows product ZIP/installer generation and fresh-account lifecycle retest passed (artifact source `d3e7376`, harness `d6254be`).
+- [x] Final `e672f9f` same-source Windows/Ubuntu build, product package lifecycle and post-download SHA-256 verification all passed.
+- [x] Same-source candidate release workflow passed end to end, including strict SHA-256 verification (run 41647138067, `e672f9f`).
 - [ ] Complete real-app automatic-toolbar feature-click acceptance pending (test-tool window boundary).
 - [ ] Clean Windows machine deployment NOT TESTED — environment unavailable.
 - [ ] Previous packaged-version upgrade NOT TESTED — no predecessor installer.
-- [ ] Packaged production credential path/key separation NOT TESTED; vault-retention and native adapter tests are narrower.
+- [x] Linux installed-runtime production adapters read four distinct provider values; deletion isolation and post-uninstall retention passed.
+- [x] Windows installed-runtime production adapters read four distinct provider values; settings/vault retention and program removal passed.
+- [ ] Main-executable AI credential use NOT TESTED; external adapter probes do not generate an AI request from the main app.
 - [ ] GNOME X11/Wayland acceptance NOT TESTED — environment unavailable.
-- [ ] Physical mixed DPI/fractional scaling NOT TESTED.
+- [x] Physical primary 100% / secondary 125% native policy/placement passed 11 tests with zero skips; original 100/100 restored.
+- [ ] Other physical scale combinations and GNOME fractional scaling NOT TESTED.
 - [ ] Native AT-SPI bus-loss/target-exit recovery NOT TESTED; restart limitation documented.
 - [ ] Multi-hour soak, complete COM/D-Bus allocation accounting and real native P95 latency NOT TESTED.
 - [ ] Fully frozen system dependency graph / identical output bytes NOT TESTED.

@@ -45,12 +45,23 @@ Mathematical 100/125/150/200 percent and negative-origin mapping is Level A.
 Current native policy test verifies actual PMv2 awareness, placement on every
 connected QScreen, and source focus/selection across show, hide and feature click
 in an owned RichEdit fixture. Local M6 policy result: 11 PASS, zero skips.
-Physical mixed-DPI / fractional-scaling acceptance remains NOT TESTED.
-Current physical display metadata (both effective DPI 96 = 100%): primary
+Physical display metadata before testing (both effective DPI 96 = 100%): primary
 `(0,0) 1920×1080`, work area `1920×1032`; secondary portrait
 `(1920,-371) 1080×1920`, work area `1080×1872`. The native policy placement test
 passes for both actual HMONITOR/QScreen identities, including negative Y.
 Reply Composer activation is intentional and is separate from toolbar focus.
+
+Follow-up on 2026-11-03: temporarily set the portrait secondary to **125%** using
+Windows Display Settings while keeping the primary at 100%. Native
+`GetScaleFactorForMonitor` confirmed 100/125, with physical secondary geometry
+`(1920,-371) 1080×1920` and work area `1080×1860`. The same native policy suite
+passed **11 tests, zero failures/skips**, including actual HMONITOR/QScreen
+placement on both screens, PMv2 and the owned fixture focus/click scenario.
+This is physical mixed-DPI native-policy evidence, not a Notepad/browser flow
+on every screen. Raw result: `.local/m6-native-local/policy-mixed125.out`.
+The secondary was restored to **100%**, verified through Settings and the native
+scale API; its work area returned to `1080×1872`. Settings was closed afterward.
+Physical 150/200% and additional mixed-DPI configurations remain NOT TESTED.
 
 ## Ubuntu GNOME sessions
 
