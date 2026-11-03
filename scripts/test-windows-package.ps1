@@ -162,9 +162,14 @@ $settingFixtures = @(
 try {
     foreach ($target in $targets) { [PackageCredentialFixture]::Write($target, $fixtures[$target]); $writtenTargets.Add($target) }
     foreach ($entry in $settingFixtures) {
-        New-Item -Path "$settingsKey\$($entry[0])" -Force | Out-Null
+        # Registry New-Item -Force replaces existing values; unlike directory
+        # creation, repeating it would erase earlier fields in the same group.
+        if (!(Test-Path -LiteralPath "$settingsKey\$($entry[0])")) {
+            New-Item -Path "$settingsKey\$($entry[0])" -Force | Out-Null
+        }
         New-ItemProperty -LiteralPath "$settingsKey\$($entry[0])" -Name $entry[1] -Value $entry[2] -PropertyType String -Force | Out-Null
     }
+    Assert-Fixtures
     $extract = Join-Path $testRoot 'portable'
     Expand-Archive -LiteralPath $zip -DestinationPath $extract
     $portableRoot = Join-Path $extract $prefix
