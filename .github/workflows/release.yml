@@ -47,7 +47,9 @@ jobs:
         run: |
           set -euo pipefail
           for platform in candidate/*; do
-            (cd "$platform" && sha256sum --check SHA256SUMS.txt)
+            # Accept CRLF in older Windows manifests without changing the
+            # artifact bytes; new manifests are explicitly LF on both platforms.
+            (cd "$platform" && sed 's/\r$//' SHA256SUMS.txt | sha256sum --check --strict)
           done
           {
             echo '# WorkSidekick 0.7.0-rc1 candidate artifacts'

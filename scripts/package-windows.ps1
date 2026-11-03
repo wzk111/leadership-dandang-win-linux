@@ -184,6 +184,7 @@ foreach ($name in @("$prefix.zip","$prefix-setup.exe")) {
 $checksums = Get-ChildItem -LiteralPath $artifacts -File | Sort-Object Name | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
 }
-$checksums | Set-Content -LiteralPath (Join-Path $artifacts 'SHA256SUMS.txt') -Encoding ascii
+# Use LF explicitly so GNU sha256sum can consume this on the Ubuntu aggregator.
+[System.IO.File]::WriteAllText((Join-Path $artifacts 'SHA256SUMS.txt'), ($checksums -join "`n") + "`n", [System.Text.Encoding]::ASCII)
 Write-Output "Product artifacts: $artifacts"
 Get-Content -LiteralPath (Join-Path $artifacts 'SHA256SUMS.txt')
