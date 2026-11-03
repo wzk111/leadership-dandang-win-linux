@@ -37,10 +37,6 @@ jobs:
           $testExit = $LASTEXITCODE
           Get-ChildItem build/test-results/*.txt | ForEach-Object { Get-Content $_.FullName }
           exit $testExit
-      - name: Launch smoke
-        run: |
-          $process = Start-Process -FilePath .\build\worksidekick.exe -ArgumentList '--smoke-test' -PassThru -Wait -WindowStyle Hidden
-          if ($process.ExitCode -ne 0) { throw "Launch smoke failed: $($process.ExitCode)" }
       - name: Install verified Inno Setup 6.7.0 in runner temporary directory
         shell: pwsh
         run: |
@@ -64,6 +60,12 @@ jobs:
       - name: Product portable and installer lifecycle smoke
         shell: pwsh
         run: ./scripts/test-windows-package.ps1 -ArtifactDirectory build/packages -Version 0.7.0-rc1
+      # Native QSettings can create its empty registry key even when startup only
+      # reads defaults. Keep the product account pristine for the refusal guard.
+      - name: Launch smoke
+        run: |
+          $process = Start-Process -FilePath .\build\worksidekick.exe -ArgumentList '--smoke-test' -PassThru -Wait -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Launch smoke failed: $($process.ExitCode)" }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
