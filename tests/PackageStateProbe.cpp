@@ -61,6 +61,8 @@ void write(ws::ISecretStore& store, const QString& provider, bool remove = false
 }
 
 bool stateMatches(QSettings& settings) {
+    // Settings::load can migrate this legacy value. Verification is read-only.
+    if (settings.contains("ai/model")) fail();
     const auto ai = ws::Settings::load(settings);
     const auto profile = ws::Profile::load(settings);
     const auto features = ws::FeaturePreferences::load(settings);
@@ -82,6 +84,9 @@ void verify(ws::ISecretStore& store, QSettings& settings) {
 void seed(ws::ISecretStore& store, QSettings& settings) {
 #ifdef Q_OS_LINUX
     if (qEnvironmentVariable("WORKSIDEKICK_TEST_ISOLATED_KEYRING") != "1") fail();
+    // The opt-in alone is not proof of an empty disposable account. Refuse all
+    // pre-existing settings before any model load (which can migrate) or save.
+    if (!settings.allKeys().isEmpty() || settings.status() != QSettings::NoError) fail();
     // Check every account before the first write. Never overwrite an unexpected
     // key, even if an isolated-keyring opt-in was set accidentally.
     for (const auto& provider : providers) {

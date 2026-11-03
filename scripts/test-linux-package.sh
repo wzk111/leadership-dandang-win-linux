@@ -81,6 +81,20 @@ for attempt in {1..100}; do
   sleep 0.1
 done
 test "$ready" = 1
+if [[ "$1" = '--seed' ]]; then
+  # Verify the probe's refusal against pre-existing settings before seeding the
+  # disposable account. This exact file is created and removed only by the test.
+  settings_file="$XDG_CONFIG_HOME/WorkSidekick/WorkSidekick.conf"
+  test ! -e "$settings_file"
+  printf '%s\n' '[profile]' 'role=Synthetic pre-existing settings guard' > "$settings_file"
+  original_hash=$(sha256sum "$settings_file")
+  if WS_M6_PACKAGE_PROBE=1 WORKSIDEKICK_TEST_ISOLATED_KEYRING=1 timeout 30 /package/test_package_state_probe --seed; then
+    echo 'Probe unexpectedly overwrote existing settings' >&2; exit 1
+  fi
+  test "$(sha256sum "$settings_file")" = "$original_hash"
+  rm -- "$settings_file"
+  echo 'PASS: probe refused existing settings and preserved their bytes'
+fi
 WS_M6_PACKAGE_PROBE=1 WORKSIDEKICK_TEST_ISOLATED_KEYRING=1 timeout 30 /package/test_package_state_probe "$1"
 if [[ "$1" = '--seed' ]]; then
   xvfb-run -a timeout 30 /usr/bin/worksidekick --smoke-test
