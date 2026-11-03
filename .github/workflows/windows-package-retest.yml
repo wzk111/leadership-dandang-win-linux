@@ -1,0 +1,48 @@
+name: M6 Windows package retest
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Existing run in this repository with product and native-test artifacts
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package-lifecycle:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-packages
+          path: packages
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-native-tests
+          path: native-tests
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Isolate external probe from developer DLLs and record provenance
+        shell: pwsh
+        run: |
+          $probe = @(Get-ChildItem native-tests -Filter test_package_state_probe.exe -Recurse -File)
+          if ($probe.Count -ne 1) { throw 'Expected exactly one external probe' }
+          New-Item -ItemType Directory probe | Out-Null
+          Copy-Item -LiteralPath $probe[0].FullName -Destination probe/test_package_state_probe.exe
+          Get-Content packages/build-metadata.json
+          git rev-parse HEAD
+          Write-Output 'Diagnostic retest of existing artifacts, not a new candidate build.'
+      - name: Verify product lifecycle on a fresh hosted account
+        shell: pwsh
+        run: ./scripts/test-windows-package.ps1 -ArtifactDirectory packages -ProbeExecutable probe/test_package_state_probe.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-package-retest-evidence
+          path: packages/windows-package-smoke.json
+          if-no-files-found: warn
