@@ -96,9 +96,12 @@ normal launch, and verifies running-app uninstall is safely refused. After
 stopping only its own primary, it verifies every manifest file is removed.
 It checks synthetic provider/model, Profile, feature, automatic toolbar,
 shortcut preferences and four distinct synthetic provider vault values remain
-intact. Vault retention is checked through Windows APIs; a packaged-app
-credential read is NOT TESTED. Provider access isolation is covered by the
-separate native unit suite, not inferred from package retention checks.
+intact. A test-only external `build/test_package_state_probe.exe` also checks
+the production settings/Profile/preference models and reads all four distinct
+provider values through the production native adapters using installed Qt DLLs.
+The probe never enters the product stage and creates no network service. This
+verifies packaged runtime adapter access; it does not send an AI request from
+the main executable. `-ProbeExecutable` may select another test build path.
 It refuses to start if existing product settings, credentials, registration or
 processes are found. It removes only its synthetic data after the test.
 

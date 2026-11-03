@@ -5,9 +5,12 @@ set -Eeuo pipefail
 trap 'echo "ERROR: package smoke host failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 package=$(realpath -- "${1:?Usage: test-linux-package.sh package.deb [evidence-dir]}")
 evidence_dir=$(realpath -m -- "${2:-$(dirname -- "$package")}")
+probe=$(realpath -- "${3:-build/test_package_state_probe}")
+test -x "$probe"
 mkdir -p -- "$evidence_dir"
 docker run --rm -i --platform linux/amd64 \
   --mount "type=bind,source=$package,target=/package/worksidekick.deb,readonly" \
+  --mount "type=bind,source=$probe,target=/package/test_package_state_probe,readonly" \
   ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11 bash -s <<'CONTAINER' 2>&1 | tee "$evidence_dir/install-uninstall.txt"
 set -Eeuo pipefail
 trap 'echo "ERROR: package smoke container failed at line $LINENO: $BASH_COMMAND" >&2' ERR
@@ -28,7 +31,7 @@ cat /etc/dpkg/dpkg.cfg.d/zz-worksidekick-docs
 apt-get update
 # Only the package and test harness are requested. Runtime libraries must be
 # supplied by the DEB dependency declarations, not the CI build environment.
-apt-get install -y --no-install-recommends /package/worksidekick.deb xvfb xauth dbus-x11 desktop-file-utils
+apt-get install -y --no-install-recommends /package/worksidekick.deb xvfb xauth dbus-x11 desktop-file-utils gnome-keyring
 echo 'Resolved runtime package versions (distribution repositories, not a pinned apt snapshot):'
 dpkg-query -W -f='${binary:Package}=${Version}\n'
 echo 'Checking installed package version, architecture and absence of Qt development dependencies'
@@ -55,12 +58,40 @@ install -d -m 700 -o smoke -g smoke /home/smoke/runtime /home/smoke/.config/Work
 printf '%s\n' 'synthetic-settings-retention' > /home/smoke/.config/WorkSidekick/package-retention.txt
 printf '%s\n' 'synthetic-userdata-retention' > /home/smoke/.local/share/WorkSidekick/package-retention.txt
 chown -R smoke:smoke /home/smoke
+# Test harness only: no probe or keyring daemon is shipped in the DEB. Each phase
+# gets a fresh session bus and owned foreground daemon, but retains the same
+# isolated home/keyring across package removal. No desktop user's vault is used.
+cat > /tmp/worksidekick-keyring-phase.sh <<'PHASE'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+keyring_pid=''
+cleanup() {
+  if [[ -n "$keyring_pid" ]]; then
+    kill "$keyring_pid" 2>/dev/null || true
+    wait "$keyring_pid" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+printf '%s' 'synthetic-package-password' | gnome-keyring-daemon --foreground --unlock --components=secrets > /tmp/worksidekick-keyring-"$1".log 2>&1 &
+keyring_pid=$!
+ready=0
+for attempt in {1..100}; do
+  kill -0 "$keyring_pid"
+  if dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.NameHasOwner string:org.freedesktop.secrets | grep -q 'boolean true'; then ready=1; break; fi
+  sleep 0.1
+done
+test "$ready" = 1
+WS_M6_PACKAGE_PROBE=1 WORKSIDEKICK_TEST_ISOLATED_KEYRING=1 timeout 30 /package/test_package_state_probe "$1"
+if [[ "$1" = '--seed' ]]; then
+  xvfb-run -a timeout 30 /usr/bin/worksidekick --smoke-test
+fi
+PHASE
 echo 'Checking installed application startup as a normal user under Xvfb'
 runuser -u smoke -- env HOME=/home/smoke \
   XDG_CONFIG_HOME=/home/smoke/.config XDG_DATA_HOME=/home/smoke/.local/share \
   XDG_RUNTIME_DIR=/home/smoke/runtime QT_QPA_PLATFORM=xcb \
-  dbus-run-session -- xvfb-run -a timeout 30 /usr/bin/worksidekick --smoke-test
-echo 'PASS: installed binary launched as non-root with isolated synthetic settings'
+  dbus-run-session -- bash /tmp/worksidekick-keyring-phase.sh --seed
+echo 'PASS: installed launch and production settings/4 distinct Secret Service provider adapter reads; provider deletion isolation verified'
 # Capture files before removal; dpkg may keep directory entries shared with
 # other packages, so check the actual files and links rather than directories.
 mapfile -t installed_files < <(dpkg-query -L worksidekick | while IFS= read -r path; do
@@ -74,6 +105,10 @@ for path in "${installed_files[@]}"; do
 done
 grep -qx 'synthetic-settings-retention' /home/smoke/.config/WorkSidekick/package-retention.txt
 grep -qx 'synthetic-userdata-retention' /home/smoke/.local/share/WorkSidekick/package-retention.txt
-echo 'PASS: uninstall removed package files and retained synthetic settings/user data'
-echo 'NOT TESTED: real GNOME X11/Wayland, tray, Secret Service, previous-release upgrade'
+runuser -u smoke -- env HOME=/home/smoke \
+  XDG_CONFIG_HOME=/home/smoke/.config XDG_DATA_HOME=/home/smoke/.local/share \
+  XDG_RUNTIME_DIR=/home/smoke/runtime QT_QPA_PLATFORM=xcb \
+  dbus-run-session -- bash /tmp/worksidekick-keyring-phase.sh --verify
+echo 'PASS: uninstall removed package files and retained real QSettings/Profile/preferences and 4 distinct keyring credentials'
+echo 'NOT TESTED: real GNOME X11/Wayland, tray, main executable AI credential use, previous-release upgrade'
 CONTAINER

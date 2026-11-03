@@ -2,7 +2,8 @@
 param(
     [string]$ArtifactDirectory = 'build/packages',
     [string]$Version = '0.7.0-rc1',
-    [string]$PreviousInstallerPath = ''
+    [string]$PreviousInstallerPath = '',
+    [string]$ProbeExecutable = 'build/test_package_state_probe.exe'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -13,6 +14,7 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
 }
 $repo = Split-Path -Parent $PSScriptRoot
 $artifacts = (Resolve-Path -LiteralPath $ArtifactDirectory).Path
+$probe = (Resolve-Path -LiteralPath $ProbeExecutable).Path
 $prefix = "WorkSidekick-$Version-windows-x64"
 $zip = Join-Path $artifacts "$prefix.zip"
 $installer = Join-Path $artifacts "$prefix-setup.exe"
@@ -88,7 +90,7 @@ $writtenTargets = [System.Collections.Generic.List[string]]::new()
 $ownedProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 $fixtures = @{}
 foreach ($target in $targets) { $fixtures[$target] = "WorkSidekick M6 synthetic sentinel for $target; not an API key" }
-$results = [ordered]@{ environment='GitHub-hosted Windows runner'; clean_machine='NOT TESTED - build runner has developer tools'; desktop='NOT TESTED - no real application acceptance'; portable='NOT TESTED'; helper_runtime='NOT TESTED'; install='NOT TESTED'; update='NOT TESTED'; single_instance='NOT TESTED'; running_app_uninstall='NOT TESTED'; uninstall='NOT TESTED'; settings='NOT TESTED'; credentials='NOT TESTED'; packaged_credential_read='NOT TESTED - vault retention only; native unit suite checks provider separation' }
+$results = [ordered]@{ environment='GitHub-hosted Windows runner'; clean_machine='NOT TESTED - build runner has developer tools'; desktop='NOT TESTED - no real application acceptance'; portable='NOT TESTED'; helper_runtime='NOT TESTED'; install='NOT TESTED'; update='NOT TESTED'; single_instance='NOT TESTED'; running_app_uninstall='NOT TESTED'; uninstall='NOT TESTED'; settings='NOT TESTED'; credentials='NOT TESTED'; packaged_credential_read='NOT TESTED' }
 function Start-OwnedProcess([string]$Executable, [string[]]$Arguments = @(), [string]$StandardOutput = '') {
     $options = @{ FilePath=$Executable; WorkingDirectory=$testRoot; PassThru=$true; WindowStyle='Hidden' }
     if ($Arguments.Count -gt 0) { $options.ArgumentList = $Arguments }
@@ -188,9 +190,18 @@ try {
     Assert-InstalledPayload
     Invoke-CleanSmoke $installRoot
     Assert-Fixtures
+    Invoke-CleanEnvironment {
+        $env:PATH = "$installRoot;$env:SystemRoot\System32;$env:SystemRoot"
+        $savedProbeOptIn = [Environment]::GetEnvironmentVariable('WS_M6_PACKAGE_PROBE', 'Process')
+        try {
+            $env:WS_M6_PACKAGE_PROBE = '1'
+            Invoke-CheckedProcess $probe @('--verify') 30000
+        } finally { [Environment]::SetEnvironmentVariable('WS_M6_PACKAGE_PROBE', $savedProbeOptIn, 'Process') }
+    }
     $results.update = if ($PreviousInstallerPath) { 'PASS - supplied previous installer to candidate' } else { 'PASS - same-version reinstall only; previous-version upgrade NOT TESTED' }
     $results.settings = 'PASS - provider/model, Profile, feature and shortcut preferences retained'
     $results.credentials = 'PASS - four distinct provider sentinel values retained in Windows vault; packaged app read NOT TESTED'
+    $results.packaged_credential_read = 'PASS - external test-only probe reads production QSettings and 4 distinct native provider adapters using installed Qt DLLs; no main executable AI request'
     $primary = Invoke-CleanEnvironment { Start-OwnedProcess (Join-Path $installRoot 'worksidekick.exe') }
     Assert-PrimaryReady $primary
     Invoke-CleanEnvironment {

@@ -183,3 +183,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTING)
   add_test(NAME linux_stability COMMAND test_linux_stability)
   set_tests_properties(linux_stability PROPERTIES TIMEOUT 120)
 endif()
+if(BUILD_TESTING)
+  # External delivery probe; run only in isolated package smoke accounts. Never installed.
+  add_executable(test_package_state_probe tests/PackageStateProbe.cpp)
+  target_link_libraries(test_package_state_probe PRIVATE worksidekick_platform worksidekick_core Qt6::Core)
+endif()

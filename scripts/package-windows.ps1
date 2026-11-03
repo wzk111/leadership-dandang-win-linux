@@ -131,7 +131,9 @@ Prefix=.
 Plugins=.
 Translations=translations
 '@ | Set-Content -LiteralPath (Join-Path $stage 'qt.conf') -Encoding ascii
-foreach ($name in @('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','Qt6Network.dll','Qt6Concurrent.dll','platforms/qwindows.dll')) {
+# QtConcurrent::run is instantiated into this product; the optimized binaries
+# import no Qt6Concurrent DLL. Let windeployqt follow the actual PE imports.
+foreach ($name in @('Qt6Core.dll','Qt6Gui.dll','Qt6Widgets.dll','Qt6Network.dll','platforms/qwindows.dll')) {
     if (!(Test-Path -LiteralPath (Join-Path $stage $name))) { throw "Required deployed runtime missing: $name" }
 }
 $licenseDir = Join-Path $stage 'licenses'
